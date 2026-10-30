@@ -14,7 +14,7 @@ def add_assistant_message(messages, text):
     assistant_message = {"role": "assistant", "content": text}
     messages.append(assistant_message)
     
-def chat(messages, system=None, temperature=None, model=model):
+def chat(messages, system=None, temperature=None, model=model, stop_sequences=None):
     params = {
         "model": model,
         "max_tokens": 1000,
@@ -27,7 +27,10 @@ def chat(messages, system=None, temperature=None, model=model):
 
     if system:
         params["system"] = system
-    
+
+    if stop_sequences:
+        params["stop_sequences"] = stop_sequences
+
     message = client.messages.create(**params)
     
     return "".join(b.text for b in message.content if b.type == "text")
