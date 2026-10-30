@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from anthropic import Anthropic
 
-from lesson_001_requests import add_user_message, chat, add_assistant_message
+from lesson_002_system_prompt import add_user_message, chat, add_assistant_message
 
 load_dotenv()
 

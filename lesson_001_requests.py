@@ -14,28 +14,33 @@ def add_assistant_message(messages, text):
     assistant_message = {"role": "assistant", "content": text}
     messages.append(assistant_message)
     
-def chat(messsages):
-    message = client.messages.create(
-        model=model,
-        max_tokens=1000,
-        messages=messsages
-    )
+def chat(messsages, system=None):
+    params = {
+        "model": model,
+        "max_tokens": 1000,
+        "messages": messsages
+    }
+    
+    if system:
+        params["system"] = system
+    
+    message = client.messages.create(**params)
     
     return "".join(b.text for b in message.content if b.type == "text")
 
-messages = []
+# messages = []
 
-add_user_message(messages, "Define quantum computing in one sentence")
-print(messages)
+# add_user_message(messages, "Define quantum computing in one sentence")
+# print(messages)
 
-answer = chat(messages)
-print(answer)
+# answer = chat(messages)
+# print(answer)
 
-add_assistant_message(messages, answer)
-print(messages)
+# add_assistant_message(messages, answer)
+# print(messages)
 
-add_user_message(messages, "Write another sentence")
-print(messages)
+# add_user_message(messages, "Write another sentence")
+# print(messages)
 
-answer = chat(messages)
-print(answer)
+# answer = chat(messages)
+# print(answer)
