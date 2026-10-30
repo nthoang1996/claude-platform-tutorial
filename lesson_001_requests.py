@@ -14,13 +14,17 @@ def add_assistant_message(messages, text):
     assistant_message = {"role": "assistant", "content": text}
     messages.append(assistant_message)
     
-def chat(messsages, system=None):
+def chat(messages, system=None, temperature=None, model=model):
     params = {
         "model": model,
         "max_tokens": 1000,
-        "messages": messsages
+        "messages": messages
     }
-    
+
+    # SDK 1.0.0's create() has no temperature argument, so send it in the body
+    if temperature is not None:
+        params["extra_body"] = {"temperature": temperature}
+
     if system:
         params["system"] = system
     
