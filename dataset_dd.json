@@ -1,0 +1,159 @@
+[
+  {
+    "prompt_inputs": {
+      "sheet": "Base Design Sheet | History Updated: 2024-01-15 | Overview: Multi-source data consolidation from SAP ERP, Salesforce CRM, and PostgreSQL Data Warehouse with conflicting schemas requiring reconciliation | Sender Spec: SAP (customer master with 50 fields, date format DD.MM.YYYY), Salesforce (contact records with 35 fields, date format YYYY-MM-DD), PostgreSQL (legacy customer table with 28 fields, numeric IDs) | Receiver Spec: Unified customer dimension table in Snowflake (standardized schema, 45 fields, ISO 8601 dates, surrogate keys) | Mapping: Detailed field-level transformations addressing schema conflicts, data type conversions, and duplicate resolution rules",
+      "type": "DB to DB",
+      "mapping_sheet": "Physical Columns: SAP.KUNNR (VARCHAR 10) \u2192 Snowflake.CUSTOMER_ID (VARCHAR 20); SAP.ERDAT (CHAR 8, DD.MM.YYYY) \u2192 Snowflake.CREATED_DATE (DATE, ISO 8601); Salesforce.AccountId (VARCHAR 18) \u2192 Snowflake.SFDC_ACCOUNT_ID (VARCHAR 20); PostgreSQL.cust_id (INTEGER) \u2192 Snowflake.LEGACY_CUST_ID (INTEGER). Logical Columns: Customer Identifier, Creation Date, Last Modified Date. Data Types: String conversions, date standardization, numeric padding. Rules: Duplicate detection via fuzzy matching on company name + address, priority hierarchy (SAP > Salesforce > PostgreSQL), null handling with default values, referential integrity validation.",
+      "overview_sheet": "Workflow Chart (Left): [SAP ERP] \u2192 Extract Stage \u2192 [Salesforce CRM] \u2192 Extract Stage \u2192 [PostgreSQL] \u2192 Extract Stage \u2192 Consolidation Layer (Deduplication + Schema Mapping) \u2192 Validation Stage \u2192 [Snowflake DW] Load Stage. Description (Right): Extract Stage performs full load from SAP with incremental CDC from Salesforce and PostgreSQL; Consolidation Layer applies fuzzy matching rules to identify duplicates across 3 sources and resolves conflicts using priority rules; Validation Stage performs data quality checks (completeness, format compliance, referential integrity); Load Stage performs upsert into Snowflake dimension table with SCD Type 2 tracking."
+    },
+    "solution_criteria": [
+      "Detail Design addresses all three source systems with specific field mappings and schema conflict resolution",
+      "Includes transformation rules for date format standardization and data type conversions across sources",
+      "Specifies duplicate detection and reconciliation strategy with clear priority hierarchy",
+      "Documents complete workflow from extraction through validation to load with technical implementation details"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a multi-source ETL design involving data consolidation from 3+ different systems with conflicting schemas"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "Base Design Document - Customer Data Migration Project\n\nHistory Updated: Version 1.0 - Initial Design\n\nOverview: Migrate customer master data from legacy CSV files to PostgreSQL database with data standardization and validation.\n\nSender Spec: CSV file (customers_legacy.csv) containing customer records with fields: CustomerID, FullName, EmailAddress, PhoneNumber, RegistrationDate\n\nReceiver Spec: PostgreSQL table 'customers' with columns: customer_id, customer_name, email, phone, registration_ts, created_at\n\nMapping: CustomerID\u2192customer_id (Integer), FullName\u2192customer_name (Varchar 255), EmailAddress\u2192email (Varchar 255), PhoneNumber\u2192phone (Varchar 20), RegistrationDate\u2192registration_ts (Timestamp)",
+      "type": "File to DB",
+      "mapping_sheet": "| Physical Column | Logical Column | Data Type | Length | Transformation Rule | Required |\n|---|---|---|---|---|---|\n| CustomerID | customer_id | Integer | - | Direct mapping, validate positive integers | Yes |\n| FullName | customer_name | Varchar | 255 | Trim whitespace, convert to proper case | Yes |\n| EmailAddress | email | Varchar | 255 | Lowercase, validate email format (RFC 5322) | Yes |\n| PhoneNumber | phone | Varchar | 20 | Remove non-numeric characters except +, format as E.164 | No |\n| RegistrationDate | registration_ts | Timestamp | - | Parse from MM/DD/YYYY format to ISO 8601 timestamp | Yes |\n| - | created_at | Timestamp | - | System generated, current timestamp at load time | Yes |",
+      "overview_sheet": "WORKFLOW CHART:\n[CSV Source] \u2192 [Extract] \u2192 [Validate] \u2192 [Transform] \u2192 [Load] \u2192 [PostgreSQL Target]\n\nWORKFLOW DESCRIPTIONS:\n1. Extract: Read customer_legacy.csv file, handle encoding (UTF-8), skip header row\n2. Validate: Check data types, verify required fields are non-null, validate email and phone formats\n3. Transform: Apply case conversion, date format conversion, phone normalization, trim whitespace\n4. Load: Insert validated records into PostgreSQL customers table with error logging for failed rows\n5. Post-Load: Generate summary report with record counts (total, successful, failed)"
+    },
+    "solution_criteria": [
+      "Detail Design includes complete mapping specification with all transformation rules for each field",
+      "Detail Design specifies validation requirements and error handling strategy",
+      "Detail Design documents the complete ETL workflow stages with clear data flow from source to target",
+      "Detail Design addresses data type conversions and format standardization for the File to DB scenario"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a simple single-source-to-single-target ETL design with basic data transformation rules"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "History Updated: Last modified 2024-01-15 by DataEng Team | Overview: Customer data consolidation from 3 legacy systems | Sender Spec: Oracle DB (CUST_MASTER table, 2.5M records daily) | Receiver Spec: PostgreSQL DW (DIM_CUSTOMER table) | Mapping: 15 columns with transformation rules",
+      "type": "DB to DB",
+      "mapping_sheet": "CUST_ID (source: NUMBER(10), target: INTEGER, required: Y, rule: Direct mapping) | CUST_NAME (source: VARCHAR2(100), target: VARCHAR(100), required: Y, rule: TRIM and UPPER) | EMAIL (source: VARCHAR2(50), target: VARCHAR(50), required: N, rule: Validate format, reject if invalid) | CUST_STATUS (source: CHAR(1), target: CHAR(1), required: Y, rule: Map A\u2192Active, I\u2192Inactive) | LAST_UPDATED (source: DATE, target: TIMESTAMP, required: Y, rule: Convert to UTC) | PHONE (source: VARCHAR2(20), target: VARCHAR(20), required: N, rule: Remove non-numeric except +/-) | ADDRESS (source: VARCHAR2(200), target: VARCHAR(200), required: N, rule: Standardize format)",
+      "overview_sheet": "Workflow: [Extract from Oracle] \u2192 [Data Quality Validation] \u2192 [Transform & Cleanse] \u2192 [Duplicate Detection] \u2192 [Error Handling & Logging] \u2192 [Retry Mechanism (max 3 attempts)] \u2192 [Load to PostgreSQL] \u2192 [Reconciliation Report]. Extract Phase: Query CUST_MASTER with incremental load (delta detection via LAST_UPDATED). Validation Phase: Check NOT NULL constraints, data type compliance, email format validation. Transform Phase: Apply mapping rules, standardize formats, handle NULL values. Duplicate Detection: Compare CUST_ID and EMAIL against existing records, flag duplicates. Error Handling: Log failed records with error codes, route to quarantine table. Retry: Implement exponential backoff (1s, 2s, 4s) for transient failures. Load Phase: Batch insert with transaction rollback on critical errors. Reconciliation: Compare record counts and checksums between source and target."
+    },
+    "solution_criteria": [
+      "Detail Design includes all 7 workflow stages with specific data quality checks and validation rules for each column",
+      "Error handling and retry mechanism (max 3 attempts with exponential backoff) are clearly documented with failure scenarios",
+      "Mapping specification covers physical columns, logical columns, data types, transformation rules, and required field constraints"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a complex ETL pipeline including data quality checks, error handling, and retry mechanisms"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "Base Design Document containing: History Updated (version control and change log), Overview (project scope and objectives), Sender Spec (source system: Oracle OLTP database with customer and order tables), Receiver Spec (target: Snowflake data warehouse), Mapping (source-to-target column mappings with transformation rules)",
+      "type": "DB to DB",
+      "mapping_sheet": "Customer_Dimension: cust_id (physical: CUSTOMER_ID, logical: Customer Key, type: NUMBER, length: 10, rule: SCD Type 2 with effective dates, required: Yes) | cust_name (physical: CUST_NAME, logical: Customer Name, type: VARCHAR2, length: 100, rule: Track historical changes, required: Yes) | cust_status (physical: STATUS, logical: Customer Status, type: VARCHAR2, length: 20, rule: SCD Type 1 overwrite, required: Yes). Sales_Fact: fact_id (physical: ORDER_ID, logical: Order Key, type: NUMBER, length: 12, rule: Direct load, required: Yes) | cust_key_fk (physical: CUSTOMER_ID, logical: Customer Foreign Key, type: NUMBER, length: 10, rule: Lookup to dimension, required: Yes) | order_amount (physical: TOTAL_AMOUNT, logical: Order Amount, type: DECIMAL, length: 12,2, rule: Convert currency to USD, required: Yes) | order_date (physical: ORDER_DATE, logical: Order Date, type: DATE, rule: Grain: daily, required: Yes)",
+      "overview_sheet": "Workflow Chart: [Source OLTP] \u2192 [Extract Layer] \u2192 [Staging Layer] \u2192 [Transform Layer with SCD Logic] \u2192 [Load Layer] \u2192 [Target Data Warehouse]. Description: Extract retrieves incremental customer and order data daily. Staging stores raw data with change detection flags. Transform applies SCD Type 2 logic to customer_dimension (creating new records for attribute changes with valid_from/valid_to dates) and SCD Type 1 to customer_status (overwriting). Load merges dimensions and appends fact records to sales_fact table maintaining referential integrity."
+    },
+    "solution_criteria": [
+      "Detailed Design includes all ETL layer specifications (Extract, Staging, Transform, Load) with clear data flow between layers",
+      "SCD Type 2 implementation for customer_dimension is explicitly documented with effective dating mechanism and change detection logic",
+      "Mapping specifications provide complete physical-to-logical column definitions with transformation rules and data types for both dimension and fact tables",
+      "Design addresses referential integrity between fact table and slowly changing dimensions with foreign key handling"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a data warehouse ETL design including slowly changing dimensions (SCD) and fact tables"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "Base Design Document - Real-time Streaming ETL Migration\n\nHistory Updated: 2024-01-15\nCurrent State: Batch processing runs nightly with 8-hour latency\nTarget State: Real-time streaming with <5 minute latency requirement\n\nSender Spec:\n- Source: Oracle OLTP Database (Orders, Customers, Transactions tables)\n- Current: Daily batch export at 2 AM UTC\n- Target: Kafka topic with event streaming\n- Volume: 50K transactions/hour average, 200K peak\n\nReceiver Spec:\n- Target: Snowflake Data Warehouse\n- Current: Nightly load via SFTP\n- Target: Continuous ingestion via Snowflake Kafka connector\n- SLA: 95th percentile latency <5 minutes\n\nMapping:\n- Orders table \u2192 orders_stream topic \u2192 fct_orders table\n- Customers table \u2192 customers_stream topic \u2192 dim_customers table\n- Transactions table \u2192 transactions_stream topic \u2192 fct_transactions table",
+      "type": "DB to DB",
+      "mapping_sheet": "| Physical Column | Logical Column | Data Type | Length | Transformation Rule | Required |\n|---|---|---|---|---|---|\n| ORDER_ID | order_identifier | VARCHAR | 20 | Hash MD5 for PII masking | Yes |\n| CUST_ID | customer_key | NUMBER | 10 | Direct mapping | Yes |\n| ORDER_AMT | order_amount | DECIMAL | 15,2 | Currency conversion USD\u2192EUR | Yes |\n| ORDER_DATE | order_timestamp | TIMESTAMP | - | Convert to UTC, add timezone | Yes |\n| ORDER_STATUS | status_code | VARCHAR | 10 | Lookup table mapping (PENDING\u2192P, COMPLETED\u2192C) | Yes |\n| NOTES | order_notes | VARCHAR | 500 | Null handling, trim whitespace | No |",
+      "overview_sheet": "WORKFLOW CHART:\n[Oracle OLTP] \u2192 [Kafka Cluster] \u2192 [Snowflake Kafka Connector] \u2192 [Snowflake DW]\n         \u2193              \u2193                      \u2193                          \u2193\n    CDC Enabled    3 Topics            Auto-ingest Pipe          Materialized Views\n    Change Data    (orders,            Real-time load            (aggregations)\n    Capture        customers,          <5min latency\n                   transactions)\n\nWORKFLOW DESCRIPTIONS:\n1. Oracle OLTP: Implements Change Data Capture (CDC) to detect INSERT/UPDATE/DELETE operations on source tables\n2. Kafka Cluster: Receives CDC events in real-time, maintains 7-day retention, partitioned by customer_key for ordering guarantees\n3. Snowflake Connector: Consumes Kafka messages, applies transformations (masking, conversions), handles schema evolution\n4. Snowflake DW: Loads to staging tables, merges into fact/dimension tables, refreshes downstream materialized views for reporting"
+    },
+    "solution_criteria": [
+      "Detail Design includes all four workflow components (source CDC, streaming platform, ingestion connector, target warehouse) with real-time streaming architecture",
+      "Mapping sheet covers all transformation rules for transitioning from batch to streaming, including latency-relevant operations",
+      "Design addresses the <5 minute latency requirement with specific technical choices (Kafka partitioning, auto-ingest pipes, connector configuration)"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a real-time streaming ETL design transitioning from batch processing with latency requirements"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "History Updated: v2.1 (2024-01-15), Overview: JSON API data integration project, Sender Spec: REST API returning nested JSON with customer and order objects, Receiver Spec: PostgreSQL relational schema with normalized tables",
+      "type": "File to DB",
+      "mapping_sheet": "Customer (logical: cust_id\u2192physical: customer_id, type: UUID, length: 36, rule: PK/NOT NULL), Order (logical: order_id\u2192physical: order_id, type: INTEGER, length: 10, rule: PK/NOT NULL), Item (logical: item_name\u2192physical: item_name, type: VARCHAR, length: 255, rule: NOT NULL), Amount (logical: total_amount\u2192physical: total_amount, type: DECIMAL, length: 10,2, rule: >0)",
+      "overview_sheet": "Workflow: [Extract JSON from API] \u2192 [Parse nested structure] \u2192 [Flatten hierarchical data] \u2192 [Validate against rules] \u2192 [Load to PostgreSQL]. Extract: Retrieve JSON payloads from REST endpoint daily. Parse: Decompose nested customer/order/item objects. Flatten: Map array items to separate rows. Validate: Check NOT NULL, PK uniqueness, amount > 0. Load: Insert into normalized tables with transaction rollback on error."
+    },
+    "solution_criteria": [
+      "Detail design includes transformation logic for converting nested JSON structure into normalized relational tables",
+      "Mapping sheet specifies all physical and logical column names with data types and validation rules",
+      "Overview section documents the complete workflow from extraction through loading with data quality validation steps"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with an ETL design for unstructured data (JSON/XML) transformation into structured relational format"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "Base Design - Customer Data Migration\n\nHistory Updated: Last modified 2024-01-15\n\nOverview: Migrate customer records from legacy system\n\nSender Spec: Source system contains customer data\n\nReceiver Spec: Target database needs customer information\n\nMapping: customer_id, name, email, phone",
+      "type": "DB to DB",
+      "mapping_sheet": "| Physical Column | Logical Column | Type | Length | Rule Transfer | Required |\n|---|---|---|---|---|---|\n| CUST_ID | customer_id | INT | - | - | Y |\n| CUST_NAME | name | VARCHAR | - | - | Y |\n| CUST_EMAIL | email | VARCHAR | - | - | N |\n| CUST_PHONE | phone | VARCHAR | - | - | N |",
+      "overview_sheet": "Workflow: Extract \u2192 Validate \u2192 Load\n\nLeft side diagram: [Source DB] \u2192 [ETL Process] \u2192 [Target DB]\n\nRight side description: Extract customer records from legacy database. Validate data integrity and format compliance. Load transformed data into target system."
+    },
+    "solution_criteria": [
+      "Identifies and documents missing critical details (data types lengths, transformation rules, error handling, scheduling, data quality checks)",
+      "Provides explicit assumptions made due to incomplete base design specifications",
+      "Expands mapping sheet with complete physical specifications and transfer rules for each field",
+      "Includes detailed workflow steps with data validation, reconciliation, and rollback procedures"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a minimal base design lacking critical details to verify detailed expansion and assumption documentation"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "Base Design Document - Customer Data Migration Project\n\nHistory Updated: v2.1 - Added PII masking requirements\nOverview: Migrate customer records from legacy Oracle DB to cloud PostgreSQL with encryption and masking of sensitive fields (SSN, email, phone, credit card)\nSender Spec: Oracle 11g database, 2.5M customer records, unencrypted PII fields\nReceiver Spec: AWS RDS PostgreSQL, encrypted at-rest, masked PII in non-production environments\nMapping: Source columns to target columns with transformation rules",
+      "type": "DB to DB",
+      "mapping_sheet": "| Physical Column | Logical Column | Data Type | Length | Rule Transfer | Required |\n|---|---|---|---|---|---|\n| CUST_ID | CustomerID | INT | 10 | Direct copy, primary key | Yes |\n| CUST_SSN | SSN | VARCHAR | 11 | Encrypt with AES-256, mask last 5 digits in non-prod | Yes |\n| CUST_EMAIL | Email | VARCHAR | 100 | Encrypt with AES-256, hash for matching | Yes |\n| CUST_PHONE | PhoneNumber | VARCHAR | 15 | Encrypt with AES-256, mask first 6 digits | Yes |\n| CUST_CC | CreditCard | VARCHAR | 16 | Encrypt with AES-256, tokenize, never log | Yes |\n| CUST_NAME | FullName | VARCHAR | 100 | Direct copy | No |\n| CUST_ADDR | Address | VARCHAR | 255 | Direct copy | No |",
+      "overview_sheet": "WORKFLOW CHART:\n\n[Oracle Source] \u2192 [Extract] \u2192 [Validate PII] \u2192 [Encrypt/Mask] \u2192 [Load] \u2192 [PostgreSQL Target]\n\nWORKFLOW DESCRIPTIONS:\n1. Extract: Read customer records from Oracle, identify PII columns\n2. Validate PII: Verify data format (SSN pattern, email format, phone digits) before transformation\n3. Encrypt/Mask: Apply AES-256 encryption to sensitive fields; mask PII in non-production copies; tokenize credit cards\n4. Load: Insert encrypted/masked data into PostgreSQL with audit logging of all transformations\n5. Verify: Validate row counts, checksum encrypted values, confirm PII is not in logs"
+    },
+    "solution_criteria": [
+      "Detail Design specifies encryption algorithm (AES-256) and masking strategy for all PII columns (SSN, email, phone, credit card)",
+      "Mapping sheet includes transformation rules with clear masking patterns and encryption requirements for each sensitive field",
+      "Design addresses both production (encrypted only) and non-production (encrypted + masked) data handling requirements",
+      "Workflow includes validation and audit steps to ensure PII protection throughout the ETL pipeline"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with an ETL design including data masking and encryption requirements for PII (personally identifiable information)"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "Legacy HR System Migration | History Updated: 2024-01-15 | Overview: Migrate employee records from legacy COBOL-based system to modern PostgreSQL database | Sender Spec: Fixed-width text files (EBCDIC encoding, 80-char records) | Receiver Spec: Normalized PostgreSQL tables with UTF-8 encoding | Mapping: Employee ID, Name, Hire Date, Salary, Department Code",
+      "type": "File to DB",
+      "mapping_sheet": "| Physical Column | Logical Column | Source Type | Source Length | Target Type | Target Length | Conversion Rule | Required | Notes |\n|---|---|---|---|---|---|---|---|---|\n| EMP_ID_CHAR | employee_id | CHAR | 6 | INTEGER | - | Trim and convert to numeric | YES | Left-padded with zeros |\n| EMP_NAME_CHAR | full_name | CHAR | 30 | VARCHAR | 100 | EBCDIC to UTF-8, trim trailing spaces | YES | Mixed case standardization |\n| HIRE_DATE_NUM | hire_date | NUMERIC | 8 | DATE | - | YYYYMMDD format conversion to ISO 8601 | YES | Validate date range 1980-2024 |\n| SALARY_COMP | annual_salary | NUMERIC | 9 (2 decimals) | DECIMAL | 10,2 | Direct numeric conversion, validate > 0 | YES | Handle negative indicators (CR/DB) |\n| DEPT_CODE_CHAR | department_id | CHAR | 3 | VARCHAR | 10 | Lookup table mapping, uppercase | YES | Validate against department master |",
+      "overview_sheet": "WORKFLOW CHART:\n[Legacy EBCDIC Files] \u2192 [Data Validation Layer] \u2192 [Character Encoding Conversion] \u2192 [Data Type Transformation] \u2192 [Business Rule Application] \u2192 [PostgreSQL Database]\n\nWORKFLOW DESCRIPTIONS:\n1. Data Validation Layer: Read fixed-width records, validate record structure and field lengths, reject malformed records to error log\n2. Character Encoding Conversion: Convert EBCDIC encoded text to UTF-8, handle special characters and numeric indicators\n3. Data Type Transformation: Convert CHAR to INTEGER/VARCHAR/DATE/DECIMAL with appropriate precision and scale\n4. Business Rule Application: Apply lookup tables for department codes, validate salary ranges, standardize date formats\n5. Load to PostgreSQL: Insert validated records into normalized tables, log transformation statistics and any rejected records"
+    },
+    "solution_criteria": [
+      "Provides detailed technical specifications for all data type conversions (EBCDIC\u2192UTF-8, CHAR\u2192INTEGER/DATE/DECIMAL)",
+      "Includes transformation rules for each field with validation logic and error handling strategy",
+      "Maps physical legacy columns to logical target schema with complete metadata (length, type, required status)",
+      "Describes complete workflow with clear sequence from source extraction through database load"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a legacy system migration ETL design involving data type conversions and format standardization"
+  },
+  {
+    "prompt_inputs": {
+      "sheet": "History Updated: Last modified 2024-01-15 | Overview: Daily ETL pipeline processing 5M customer records from Oracle DB to Snowflake DW | Sender Spec: Oracle OLTP (transactional tables: CUSTOMERS, ORDERS, TRANSACTIONS) | Receiver Spec: Snowflake staging and fact tables | Mapping Sheet: CUSTOMERS (ID, NAME, EMAIL, PHONE, ADDRESS, CREATED_DATE, UPDATED_DATE) \u2192 DIM_CUSTOMER; ORDERS (ORDER_ID, CUSTOMER_ID, ORDER_DATE, AMOUNT, STATUS) \u2192 FACT_ORDERS; TRANSACTIONS (TXN_ID, ORDER_ID, AMOUNT, TXN_TYPE, TIMESTAMP) \u2192 FACT_TRANSACTIONS",
+      "type": "DB to DB",
+      "mapping_sheet": "| Physical Column | Logical Column | Data Type | Length | Rule Transfer | Required | CUSTOMERS.ID \u2192 DIM_CUSTOMER.CUSTOMER_KEY | VARCHAR | 50 | PK, Hash distribution | Y | CUSTOMERS.UPDATED_DATE \u2192 DIM_CUSTOMER.LOAD_DATE | TIMESTAMP | - | Filter incremental loads (>= last_run_time) | Y | ORDERS.ORDER_DATE \u2192 FACT_ORDERS.ORDER_DATE | DATE | - | Partition by month, cluster by CUSTOMER_ID | Y | TRANSACTIONS.AMOUNT \u2192 FACT_TRANSACTIONS.TRANSACTION_AMOUNT | DECIMAL | 18,2 | Validate range (0-999999), null handling | Y |",
+      "overview_sheet": "Workflow: [Source Oracle DB] \u2192 [Extract (parallel read 5 threads, batch 100K rows)] \u2192 [Transform (data validation, deduplication, aggregation)] \u2192 [Load (Snowflake bulk insert with dynamic partitioning)] \u2192 [Target Snowflake DW] | Description: Extract phase uses parallel processing across 5 partitions (by CUSTOMER_ID range) to handle 5M records efficiently; Transform applies business rules and incremental logic; Load leverages Snowflake's native partitioning on UPDATED_DATE and clustering on CUSTOMER_ID for query optimization and cost reduction."
+    },
+    "solution_criteria": [
+      "Detail Design specifies parallel processing strategy (thread count, batch size, partition keys) for high-volume data handling",
+      "Includes partitioning and clustering strategy aligned with query patterns and Snowflake performance optimization",
+      "Documents incremental load logic and filtering criteria to minimize data transfer and processing overhead",
+      "Provides performance considerations (SLA targets, resource allocation, scalability approach) for 5M+ record volumes"
+    ],
+    "task_description": "Write a Detail Design for a ETL project based on the markdown Base Design input",
+    "scenario": "Testing with a high-volume ETL design (millions of records) requiring performance optimization, partitioning, and parallel processing strategies"
+  }
+]

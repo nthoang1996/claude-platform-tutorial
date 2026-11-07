@@ -16,7 +16,8 @@ def generate_dataset():
         [
             {
                 "task": "Description of task",
-                "format: "json" or "regex" or "python"
+                "format: "json" or "regex" or "python",
+                "solution_criteria": " Key criteria for evaluating the solution"
             },
             ...additional
         ]

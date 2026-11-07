@@ -1,14 +1,17 @@
 [
   {
-    "task": "Parse an AWS S3 bucket name from an S3 URI (e.g., 's3://my-bucket/path/to/file.txt') and extract just the bucket name",
-    "format": "regex"
+    "task": "Parse an AWS S3 bucket name from a full S3 URI (e.g., 's3://my-bucket-name/path/to/object') and extract just the bucket name",
+    "format": "regex",
+    "solution_criteria": "Must correctly extract bucket names from various S3 URI formats, handle bucket names with hyphens and numbers, and work with URIs that have or don't have object paths"
   },
   {
-    "task": "Create a JSON configuration object for an AWS Lambda function that includes runtime, timeout, memory size, and environment variables",
-    "format": "json"
+    "task": "Write a Python function that takes an AWS IAM policy JSON string and returns a list of all the Actions listed in the policy statements",
+    "format": "python",
+    "solution_criteria": "Must parse JSON, handle multiple statements, extract Action fields (which can be strings or arrays), and return a deduplicated list of actions"
   },
   {
-    "task": "Write a Python function that validates if an AWS IAM role ARN is in the correct format (arn:aws:iam::account-id:role/role-name)",
-    "format": "python"
+    "task": "Create a JSON template for an AWS CloudFormation parameter that defines an EC2 instance type with constraints to only allow t3.micro, t3.small, or t3.medium",
+    "format": "json",
+    "solution_criteria": "Must follow CloudFormation parameter syntax, include proper type definition, set allowed values, and include a sensible default value"
   }
 ]
