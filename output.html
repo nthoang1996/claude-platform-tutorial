@@ -117,11 +117,11 @@
                 </div>
                 <div class="stat-box">
                     <div>Average Score</div>
-                    <div class="stat-value">2.0 / 10</div>
+                    <div class="stat-value">6.0 / 10</div>
                 </div>
                 <div class="stat-box">
                     <div>Pass Rate (≥7)</div>
-                    <div class="stat-value">0.0%</div>
+                    <div class="stat-value">60.0%</div>
                 </div>
             </div>
         </div>
@@ -140,992 +140,796 @@
             <tbody>
     
             <tr>
-                <td>Testing with a simple single-source-to-single-target ETL design with basic data transformation rules</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> Base Design Document - Customer Data Migration Project
+                <td>Testing with a multi-tenant SaaS application: extracting tenant-specific detail records with proper filtering and isolation requirements</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> A multi-tenant SaaS application stores customer data across shared tables. Extract detail records for tenant_id = 'ACME_CORP' from the orders and order_items tables. Source tables: orders (contains all tenants' orders), order_items (line items for all orders). Extraction condition: Filter by tenant_id = 'ACME_CORP' and order_status = 'COMPLETED'. Ensure data isolation—only ACME_CORP records should be included in the output.<br><strong>Table Schema:</strong> CREATE TABLE orders (order_id INT PRIMARY KEY, tenant_id VARCHAR(50) NOT NULL, customer_id INT NOT NULL, order_date DATE, order_status VARCHAR(20), total_amount DECIMAL(10,2), created_at TIMESTAMP, FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id)); CREATE TABLE order_items (item_id INT PRIMARY KEY, order_id INT NOT NULL, tenant_id VARCHAR(50) NOT NULL, product_id INT, quantity INT, unit_price DECIMAL(10,2), FOREIGN KEY (order_id) REFERENCES orders(order_id), FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id), UNIQUE(order_id, product_id));<br><strong>Mapping:</strong> orders table: order_id (physical: order_id, logical: Order Identifier, type: INT, required: YES), tenant_id (physical: tenant_id, logical: Tenant Identifier, type: VARCHAR(50), required: YES, rule: filter by 'ACME_CORP'), order_status (physical: order_status, logical: Order Status, type: VARCHAR(20), required: YES, rule: filter by 'COMPLETED'). order_items table: item_id (physical: item_id, logical: Line Item ID, type: INT, required: YES), order_id (physical: order_id, logical: Order Reference, type: INT, required: YES), tenant_id (physical: tenant_id, logical: Tenant Identifier, type: VARCHAR(50), required: YES, rule: filter by 'ACME_CORP'), quantity (physical: quantity, logical: Item Quantity, type: INT, required: YES), unit_price (physical: unit_price, logical: Unit Price, type: DECIMAL(10,2), required: YES).</td>
+                <td class="criteria">• SQL query filters orders and order_items by tenant_id = 'ACME_CORP' with no cross-tenant data leakage<br>• Query includes order_status = 'COMPLETED' filter on orders table<br>• Query joins orders and order_items tables using order_id with proper tenant_id validation in join condition<br>• Output includes all mapped columns for both tables with correct data types</td>
+                <td class="output"><pre>```sql
+SELECT
+    -- Orders table columns
+    o.order_id,
+    o.tenant_id,
+    o.customer_id,
+    o.order_date,
+    o.order_status,
+    o.total_amount,
+    o.created_at,
+    
+    -- Order Items table columns
+    oi.item_id,
+    oi.order_id AS order_item_order_id,
+    oi.tenant_id AS order_item_tenant_id,
+    oi.product_id,
+    oi.quantity,
+    oi.unit_price
+    
+FROM orders o
+INNER JOIN order_items oi
+    ON o.order_id = oi.order_id
+    AND o.tenant_id = oi.tenant_id
 
-History Updated: Version 1.0 - Initial Design
+WHERE o.tenant_id = 'ACME_CORP'
+  AND oi.tenant_id = 'ACME_CORP'
+  AND o.order_status = 'COMPLETED'
 
-Overview: Migrate customer master data from legacy CSV files to PostgreSQL database with data standardization and validation.
-
-Sender Spec: CSV file (customers_legacy.csv) containing customer records with fields: CustomerID, FullName, EmailAddress, PhoneNumber, RegistrationDate
-
-Receiver Spec: PostgreSQL table 'customers' with columns: customer_id, customer_name, email, phone, registration_ts, created_at
-
-Mapping: CustomerID→customer_id (Integer), FullName→customer_name (Varchar 255), EmailAddress→email (Varchar 255), PhoneNumber→phone (Varchar 20), RegistrationDate→registration_ts (Timestamp)<br><strong>type:</strong> File to DB<br><strong>mapping_sheet:</strong> | Physical Column | Logical Column | Data Type | Length | Transformation Rule | Required |
-|---|---|---|---|---|---|
-| CustomerID | customer_id | Integer | - | Direct mapping, validate positive integers | Yes |
-| FullName | customer_name | Varchar | 255 | Trim whitespace, convert to proper case | Yes |
-| EmailAddress | email | Varchar | 255 | Lowercase, validate email format (RFC 5322) | Yes |
-| PhoneNumber | phone | Varchar | 20 | Remove non-numeric characters except +, format as E.164 | No |
-| RegistrationDate | registration_ts | Timestamp | - | Parse from MM/DD/YYYY format to ISO 8601 timestamp | Yes |
-| - | created_at | Timestamp | - | System generated, current timestamp at load time | Yes |<br><strong>overview_sheet:</strong> WORKFLOW CHART:
-[CSV Source] → [Extract] → [Validate] → [Transform] → [Load] → [PostgreSQL Target]
-
-WORKFLOW DESCRIPTIONS:
-1. Extract: Read customer_legacy.csv file, handle encoding (UTF-8), skip header row
-2. Validate: Check data types, verify required fields are non-null, validate email and phone formats
-3. Transform: Apply case conversion, date format conversion, phone normalization, trim whitespace
-4. Load: Insert validated records into PostgreSQL customers table with error logging for failed rows
-5. Post-Load: Generate summary report with record counts (total, successful, failed)</td>
-                <td class="criteria">• Detail Design includes complete mapping specification with all transformation rules for each field<br>• Detail Design specifies validation requirements and error handling strategy<br>• Detail Design documents the complete ETL workflow stages with clear data flow from source to target<br>• Detail Design addresses data type conversions and format standardization for the File to DB scenario</td>
-                <td class="output"><pre># DETAILED DESIGN DOCUMENT
-## Customer Data Migration Project
-
-**Document Version:** 2.0 - Detailed Design  
-**Last Updated:** [Current Date]  
-**Project Type:** File to Database Migration  
-**Source System:** Legacy CSV Files  
-**Target System:** PostgreSQL Database
-
----
-
-## 1. EXECUTIVE SUMMARY
-
-This document provides comprehensive technical specifications for migrating customer master data from legacy CSV format to a PostgreSQL database. The migration includes data validation, standardization, and transformation with full audit trail and error handling capabilities.
-
----
-
-## 2. SYSTEM ARCHITECTURE
-
-### 2.1 High-Level Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     MIGRATION PIPELINE                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  [CSV File]                                                    │
-│      ↓                                                          │
-│  ┌──────────────────┐                                          │
-│  │  FILE INGESTION  │  - Read CSV file                         │
-│  │  & EXTRACTION    │  - Encoding validation (UTF-8)           │
-│  │                  │  - Header row identification             │
-│  └────────┬─────────┘                                          │
-│           ↓                                                     │
-│  ┌──────────────────┐                                          │
-│  │  DATA VALIDATION │  - Type checking                         │
-│  │  LAYER           │  - Null/Required field checks            │
-│  │                  │  - Format validation                     │
-│  └────────┬─────────┘                                          │
-│           ↓                                                     │
-│  ┌──────────────────┐                                          │
-│  │  TRANSFORMATION  │  - Data standardization                  │
-│  │  LAYER           │  - Format conversion                     │
-│  │                  │  - Enrichment                            │
-│  └────────┬─────────┘                                          │
-│           ↓                                                     │
-│  ┌──────────────────┐                                          │
-│  │  LOAD LAYER      │  - Batch/Transactional insert            │
-│  │  & STAGING       │  - Conflict resolution                   │
-│  │                  │  - Error logging                         │
-│  └────────┬─────────┘                                          │
-│           ↓                                                     │
-│  ┌──────────────────┐                                          │
-│  │  PostgreSQL DB   │  - Persistent storage                    │
-│  │  (customers)     │  - Audit trail maintenance               │
-│  └──────────────────┘                                          │
-│           ↓                                                     │
-│  ┌──────────────────┐                                          │
-│  │  REPORTING &     │  - Migration summary                     │
-│  │  AUDIT LOG       │  - Error reports                         │
-│  └──────────────────┘                                          │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+ORDER BY o.order_id, oi.item_id;
 ```
 
----
+**Query Explanation:**
 
-## 3. DATA MAPPING SPECIFICATIONS
+1. **Complete Column Selection:** All mapped columns from both `orders` and `order_items` tables are explicitly selected, including identifiers, tenant filters, status, amounts, dates, and line item details.
 
-### 3.1 Detailed Column Mapping Matrix
+2. **Data Isolation:** 
+   - Filtering on `tenant_id = 'ACME_CORP'` in both the `WHERE` clause (for both tables) ensures only ACME_CORP records are extracted
+   - The `INNER JOIN` condition includes explicit tenant_id matching (`o.tenant_id = oi.tenant_id`) for additional data integrity
 
-| **Physical Column** | **Logical Column** | **Data Type** | **Length** | **Source Constraint** | **Transformation Rule** | **Validation Rule** | **Required** | **Default Value** |
-|---|---|---|---|---|---|---|---|---|
-| CustomerID | customer_id | Integer | N/A | Numeric only | Direct mapping, no transformation | Must be positive integer, >0, unique | Yes | N/A |
-| FullName | customer_name | Varchar | 255 | Text | Trim leading/trailing spaces, convert to proper case (Title Case) | Non-empty, length ≤ 255, no special characters except space/hyphen/apostrophe | Yes | N/A |
-| EmailAddress | email | Varchar | 255 | Text</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution demonstrates strong understanding of ETL design principles and provides good architectural documentation with detailed mapping specifications. However, it fails to meet three critical mandatory requirements: (1) no Python code implementation for transformations, (2) no SQL Detail sheet section, and (3) no document history. The solution appears incomplete/truncated and lacks the structured sections explicitly required by the mandatory criteria. These are not minor omissions but fundamental structural requirements that make the document non-compliant with the specification.</td>
+3. **Status Filter:** `order_status = 'COMPLETED'` ensures only completed orders are included in the extraction.
+
+4. **JOIN Logic:** Inner join between orders and order_items on `order_id` ensures all selected records have valid order-to-line-item relationships.
+
+5. **ORDER BY Compliance:** Ordering by `order_id` and `item_id` (both explicitly selected columns) ensures consistent result sets and compatibility with strict SQL standards.</pre></td>
+                <td class="score-col"><span class="score score-high">10</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: (1) All mapped columns are selected from both tables with correct data types; (2) WHERE and JOIN clauses correctly implement tenant_id = 'ACME_CORP' filtering with no cross-tenant data leakage; (3) order_status = 'COMPLETED' filter is properly applied to the orders table; (4) JOIN uses order_id with tenant_id validation; (5) ORDER BY uses selected columns in logical order. The query is secure, performant, and follows SQL best practices. The minor redundancy in tenant filtering does not violate requirements and represents defensive programming. The solution fully satisfies all stated criteria without deficiencies.</td>
             </tr>
         
             <tr>
-                <td>Testing with a real-time streaming ETL design transitioning from batch processing with latency requirements</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> Base Design Document - Real-time Streaming ETL Migration
-
-History Updated: 2024-01-15
-Current State: Batch processing runs nightly with 8-hour latency
-Target State: Real-time streaming with <5 minute latency requirement
-
-Sender Spec:
-- Source: Oracle OLTP Database (Orders, Customers, Transactions tables)
-- Current: Daily batch export at 2 AM UTC
-- Target: Kafka topic with event streaming
-- Volume: 50K transactions/hour average, 200K peak
-
-Receiver Spec:
-- Target: Snowflake Data Warehouse
-- Current: Nightly load via SFTP
-- Target: Continuous ingestion via Snowflake Kafka connector
-- SLA: 95th percentile latency <5 minutes
-
-Mapping:
-- Orders table → orders_stream topic → fct_orders table
-- Customers table → customers_stream topic → dim_customers table
-- Transactions table → transactions_stream topic → fct_transactions table<br><strong>type:</strong> DB to DB<br><strong>mapping_sheet:</strong> | Physical Column | Logical Column | Data Type | Length | Transformation Rule | Required |
-|---|---|---|---|---|---|
-| ORDER_ID | order_identifier | VARCHAR | 20 | Hash MD5 for PII masking | Yes |
-| CUST_ID | customer_key | NUMBER | 10 | Direct mapping | Yes |
-| ORDER_AMT | order_amount | DECIMAL | 15,2 | Currency conversion USD→EUR | Yes |
-| ORDER_DATE | order_timestamp | TIMESTAMP | - | Convert to UTC, add timezone | Yes |
-| ORDER_STATUS | status_code | VARCHAR | 10 | Lookup table mapping (PENDING→P, COMPLETED→C) | Yes |
-| NOTES | order_notes | VARCHAR | 500 | Null handling, trim whitespace | No |<br><strong>overview_sheet:</strong> WORKFLOW CHART:
-[Oracle OLTP] → [Kafka Cluster] → [Snowflake Kafka Connector] → [Snowflake DW]
-         ↓              ↓                      ↓                          ↓
-    CDC Enabled    3 Topics            Auto-ingest Pipe          Materialized Views
-    Change Data    (orders,            Real-time load            (aggregations)
-    Capture        customers,          <5min latency
-                   transactions)
-
-WORKFLOW DESCRIPTIONS:
-1. Oracle OLTP: Implements Change Data Capture (CDC) to detect INSERT/UPDATE/DELETE operations on source tables
-2. Kafka Cluster: Receives CDC events in real-time, maintains 7-day retention, partitioned by customer_key for ordering guarantees
-3. Snowflake Connector: Consumes Kafka messages, applies transformations (masking, conversions), handles schema evolution
-4. Snowflake DW: Loads to staging tables, merges into fact/dimension tables, refreshes downstream materialized views for reporting</td>
-                <td class="criteria">• Detail Design includes all four workflow components (source CDC, streaming platform, ingestion connector, target warehouse) with real-time streaming architecture<br>• Mapping sheet covers all transformation rules for transitioning from batch to streaming, including latency-relevant operations<br>• Design addresses the <5 minute latency requirement with specific technical choices (Kafka partitioning, auto-ingest pipes, connector configuration)</td>
-                <td class="output"><pre># DETAILED DESIGN DOCUMENT
-## Real-time Streaming ETL Migration: Oracle OLTP → Kafka → Snowflake
-
-**Document Version:** 2.0  
-**Last Updated:** 2024-01-15  
-**Status:** Ready for Implementation  
-
----
-
-## 1. ARCHITECTURE OVERVIEW
-
-### 1.1 System Architecture Diagram
-
+                <td>Testing with a simple e-commerce database requirement: extracting customer order details from a basic Base Design with tables for Orders, Customers, and Products</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract customer order details from an e-commerce database. Source tables: Orders (contains order transactions), Customers (contains customer information), and Products (contains product catalog). Extraction condition: All orders placed in the last 30 days with order status 'Completed' or 'Shipped'.<br><strong>Table Schema:</strong> CUSTOMERS: customer_id (INT, PK), customer_name (VARCHAR(100)), email (VARCHAR(100)), country (VARCHAR(50)). ORDERS: order_id (INT, PK), customer_id (INT, FK), order_date (DATE), order_status (VARCHAR(20)), total_amount (DECIMAL(10,2)). PRODUCTS: product_id (INT, PK), product_name (VARCHAR(100)), category (VARCHAR(50)), unit_price (DECIMAL(10,2)). ORDER_ITEMS: order_item_id (INT, PK), order_id (INT, FK), product_id (INT, FK), quantity (INT), item_price (DECIMAL(10,2)).<br><strong>Mapping:</strong> Customer Name (logical) -> customer_name (physical, VARCHAR(100), required). Order ID (logical) -> order_id (physical, INT, required). Order Date (logical) -> order_date (physical, DATE, required). Product Name (logical) -> product_name (physical, VARCHAR(100), required). Quantity (logical) -> quantity (physical, INT, required). Item Price (logical) -> item_price (physical, DECIMAL(10,2), required). Order Status (logical) -> order_status (physical, VARCHAR(20), required). Total Amount (logical) -> total_amount (physical, DECIMAL(10,2), required). Transfer rule: Filter by order_date >= CURRENT_DATE - 30 days AND order_status IN ('Completed', 'Shipped').</td>
+                <td class="criteria">• SQL correctly joins Orders, Customers, Products, and ORDER_ITEMS tables using appropriate foreign keys<br>• Query applies date filter (last 30 days) and status filter ('Completed' or 'Shipped') accurately<br>• All required logical columns are selected and mapped to correct physical columns<br>• Query is optimized and executable without syntax errors</td>
+                <td class="output"><pre>```sql
+SELECT
+    c.customer_id,
+    c.customer_name,
+    c.email,
+    c.country,
+    o.order_id,
+    o.order_date,
+    o.order_status,
+    o.total_amount,
+    p.product_id,
+    p.product_name,
+    p.category,
+    p.unit_price,
+    oi.order_item_id,
+    oi.quantity,
+    oi.item_price
+FROM
+    ORDERS o
+    INNER JOIN CUSTOMERS c ON o.customer_id = c.customer_id
+    INNER JOIN ORDER_ITEMS oi ON o.order_id = oi.order_id
+    INNER JOIN PRODUCTS p ON oi.product_id = p.product_id
+WHERE
+    o.order_date >= CURRENT_DATE - INTERVAL '30 days'
+    AND o.order_status IN ('Completed', 'Shipped')
+ORDER BY
+    o.order_date DESC,
+    o.order_id,
+    oi.order_item_id;
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         SOURCE LAYER                                │
-├─────────────────────────────────────────────────────────────────────┤
-│  Oracle OLTP Database (On-Premise/Cloud)                            │
-│  ├─ Orders Table (PK: ORDER_ID)                                     │
-│  ├─ Customers Table (PK: CUST_ID)                                   │
-│  └─ Transactions Table (PK: TRANS_ID)                               │
-│  └─ CDC Enabled via Oracle LogMiner / GoldenGate                     │
-└──────────────────────────────────────────────────────────────────────┘
-                               │
-                        (Real-time CDC)
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    STREAMING PLATFORM LAYER                          │
-├──────────────────────────────────────────────────────────────────────┤
-│  Apache Kafka Cluster (3 Brokers, 3 Replicas)                       │
-│  ├─ Topic: orders_stream                                            │
-│  │  └─ Partitions: 12 (by CUST_ID hash)                             │
-│  │  └─ Retention: 7 days / 200 GB                                   │
-│  ├─ Topic: customers_stream                                         │
-│  │  └─ Partitions: 6 (by CUST_ID hash)                              │
-│  └─ Topic: transactions_stream                                      │
-│     └─ Partitions: 12 (by CUST_ID hash)                             │
-│  ├─ Replication Factor: 3                                           │
-│  └─ Min ISR: 2                                                       │
-└──────────────────────────────────────────────────────────────────────┘
-                               │
-                      (Kafka Consumer)
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                  TRANSFORMATION & INGESTION LAYER                    │
-├──────────────────────────────────────────────────────────────────────┤
-│  Snowflake Kafka Connector (Managed via Cloud/Orchestration)        │
-│  ├─ Connector Type: Source Connector                                 │
-│  ├─ Transformation Engine: Snowflake Native SQL UDFs                │
-│  └─ Schema Registry: Confluent / Kafka Schema Registry              │
-└──────────────────────────────────────────────────────────────────────┘
-                               │
-                     (Streaming Ingestion)
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    DATA WAREHOUSE LAYER                              │
-├──────────────────────────────────────────────────────────────────────┤
-│  Snowflake Cloud Data Warehouse                                      │
-│  ├─ Staging Layer:                                                   │
-│  │  ├─ stg_orders (Raw Kafka ingestion)                              │
-│  │  ├─ stg_customers (Raw Kafka ingestion)                           │
-│  │  └─ stg_transactions (Raw Kafka ingestion)                        │
-│  ├─ Data Layer:                                                      │
-│  │  ├─ fct_orders (Fact table, SCD Type 2)                           │
-│  │  ├─</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution demonstrates strong architectural understanding and addresses the secondary criteria well with detailed system design and latency-aware configurations. However, it fails multiple MANDATORY requirements: (1) Python transformation code is completely absent, (2) SQL Detail sheet is missing, (3) document history is not included, and (4) the solution appears truncated/incomplete. The mandatory requirements explicitly state the output must include Python code for transformations and SQL statements in a dedicated SQL Detail sheet, neither of which are present. These are not optional enhancements but explicitly required components per the extra_important_criteria section.</td>
+
+**Query Explanation:**
+
+1. **Table Joins:** 
+   - `ORDERS` joined with `CUSTOMERS` to retrieve customer information
+   - `ORDERS` joined with `ORDER_ITEMS` to get individual line items
+   - `ORDER_ITEMS` joined with `PRODUCTS` to fetch product details
+
+2. **Column Selection:** All mapped columns are explicitly selected from respective tables:
+   - Customer attributes: `customer_id`, `customer_name`, `email`, `country`
+   - Order attributes: `order_id`, `order_date`, `order_status`, `total_amount`
+   - Product attributes: `product_id`, `product_name`, `category`, `unit_price`
+   - Order item attributes: `order_item_id`, `quantity`, `item_price`
+
+3. **Filter Conditions (Transfer Rule):**
+   - `order_date >= CURRENT_DATE - INTERVAL '30 days'` — Captures last 30 days
+   - `order_status IN ('Completed', 'Shipped')` — Filters for required statuses
+
+4. **Ordering:** Results ordered by `order_date` (DESC), `order_id`, and `order_item_id` for logical data flow and traceability</pre></td>
+                <td class="score-col"><span class="score score-high">8</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: (1) All 9 mapped logical columns are selected and correctly mapped to physical columns; (2) JOINs use correct foreign keys and are syntactically valid; (3) WHERE clause correctly implements both the 30-day filter using CURRENT_DATE - INTERVAL '30 days' and the status filter; (4) SQL is executable without syntax errors. However, the solution includes additional columns beyond the explicit mapping requirements (customer_id, email, country, product_id, category, unit_price, order_item_id). While these additions are contextually reasonable for a detail design extract, they technically exceed the stated mapping specification. The ORDER BY clause, though sensible for data organization, is not explicitly required. The solution is functionally correct and well-structured, but has minor scope creep beyond the stated requirements.</td>
             </tr>
         
             <tr>
-                <td>Testing with a complex ETL pipeline including data quality checks, error handling, and retry mechanisms</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> History Updated: Last modified 2024-01-15 by DataEng Team | Overview: Customer data consolidation from 3 legacy systems | Sender Spec: Oracle DB (CUST_MASTER table, 2.5M records daily) | Receiver Spec: PostgreSQL DW (DIM_CUSTOMER table) | Mapping: 15 columns with transformation rules<br><strong>type:</strong> DB to DB<br><strong>mapping_sheet:</strong> CUST_ID (source: NUMBER(10), target: INTEGER, required: Y, rule: Direct mapping) | CUST_NAME (source: VARCHAR2(100), target: VARCHAR(100), required: Y, rule: TRIM and UPPER) | EMAIL (source: VARCHAR2(50), target: VARCHAR(50), required: N, rule: Validate format, reject if invalid) | CUST_STATUS (source: CHAR(1), target: CHAR(1), required: Y, rule: Map A→Active, I→Inactive) | LAST_UPDATED (source: DATE, target: TIMESTAMP, required: Y, rule: Convert to UTC) | PHONE (source: VARCHAR2(20), target: VARCHAR(20), required: N, rule: Remove non-numeric except +/-) | ADDRESS (source: VARCHAR2(200), target: VARCHAR(200), required: N, rule: Standardize format)<br><strong>overview_sheet:</strong> Workflow: [Extract from Oracle] → [Data Quality Validation] → [Transform & Cleanse] → [Duplicate Detection] → [Error Handling & Logging] → [Retry Mechanism (max 3 attempts)] → [Load to PostgreSQL] → [Reconciliation Report]. Extract Phase: Query CUST_MASTER with incremental load (delta detection via LAST_UPDATED). Validation Phase: Check NOT NULL constraints, data type compliance, email format validation. Transform Phase: Apply mapping rules, standardize formats, handle NULL values. Duplicate Detection: Compare CUST_ID and EMAIL against existing records, flag duplicates. Error Handling: Log failed records with error codes, route to quarantine table. Retry: Implement exponential backoff (1s, 2s, 4s) for transient failures. Load Phase: Batch insert with transaction rollback on critical errors. Reconciliation: Compare record counts and checksums between source and target.</td>
-                <td class="criteria">• Detail Design includes all 7 workflow stages with specific data quality checks and validation rules for each column<br>• Error handling and retry mechanism (max 3 attempts with exponential backoff) are clearly documented with failure scenarios<br>• Mapping specification covers physical columns, logical columns, data types, transformation rules, and required field constraints</td>
-                <td class="output"><pre># Detailed Design Document: Customer Data Consolidation Pipeline
-
-## 1. EXECUTIVE SUMMARY
-
-**Project:** Customer Master Data Consolidation (3 Legacy Systems → PostgreSQL DW)  
-**Scope:** Daily incremental load of 2.5M customer records  
-**Source:** Oracle DB (CUST_MASTER table)  
-**Target:** PostgreSQL DW (DIM_CUSTOMER table)  
-**Last Updated:** 2024-01-15 by DataEng Team  
-**Status:** Detailed Design Phase
-
----
-
-## 2. ARCHITECTURE OVERVIEW
-
-### 2.1 High-Level Data Flow
-
+                <td>Testing with a healthcare system requirement: creating SQL extract for patient appointment details with complex joins across multiple reference tables</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract patient appointment details from a healthcare system database. Source tables: Appointments (appointment records), Patients (patient demographics), Providers (healthcare provider information), Facilities (clinic/hospital locations), and AppointmentStatus (appointment status reference). Extraction condition: All appointments scheduled for the current month with status 'Confirmed' or 'Pending', including patient name, provider name, facility location, appointment date/time, and appointment reason.<br><strong>Table Schema:</strong> CREATE TABLE Patients (PatientID INT PRIMARY KEY, FirstName VARCHAR(50), LastName VARCHAR(50), DOB DATE, PhoneNumber VARCHAR(20)); CREATE TABLE Providers (ProviderID INT PRIMARY KEY, ProviderName VARCHAR(100), Specialty VARCHAR(50), LicenseNumber VARCHAR(20)); CREATE TABLE Facilities (FacilityID INT PRIMARY KEY, FacilityName VARCHAR(100), Address VARCHAR(200), City VARCHAR(50), State CHAR(2)); CREATE TABLE AppointmentStatus (StatusID INT PRIMARY KEY, StatusName VARCHAR(20)); CREATE TABLE Appointments (AppointmentID INT PRIMARY KEY, PatientID INT FOREIGN KEY, ProviderID INT FOREIGN KEY, FacilityID INT FOREIGN KEY, StatusID INT FOREIGN KEY, AppointmentDateTime DATETIME, Reason VARCHAR(200));<br><strong>Mapping:</strong> Patients.PatientID (INT, key) → Logical: Patient Identifier; Patients.FirstName (VARCHAR(50)) → Logical: Patient First Name (required); Patients.LastName (VARCHAR(50)) → Logical: Patient Last Name (required); Providers.ProviderName (VARCHAR(100)) → Logical: Healthcare Provider Name (required); Facilities.FacilityName (VARCHAR(100)) → Logical: Appointment Location (required); Appointments.AppointmentDateTime (DATETIME) → Logical: Scheduled Date and Time (required); Appointments.Reason (VARCHAR(200)) → Logical: Appointment Reason; AppointmentStatus.StatusName (VARCHAR(20)) → Logical: Appointment Status (filter: 'Confirmed' or 'Pending' only).</td>
+                <td class="criteria">• SQL query correctly joins all five tables using appropriate foreign keys without data loss<br>• Query filters appointments for current month with only 'Confirmed' or 'Pending' statuses<br>• Result set includes all required fields: patient name, provider name, facility name, appointment date/time, and reason<br>• Query is optimized with proper indexing considerations and avoids duplicate rows</td>
+                <td class="output"><pre>```sql
+SELECT 
+    p.PatientID,
+    p.FirstName,
+    p.LastName,
+    pr.ProviderName,
+    f.FacilityName,
+    a.AppointmentDateTime,
+    a.Reason,
+    s.StatusName
+FROM 
+    Appointments a
+    INNER JOIN Patients p ON a.PatientID = p.PatientID
+    INNER JOIN Providers pr ON a.ProviderID = pr.ProviderID
+    INNER JOIN Facilities f ON a.FacilityID = f.FacilityID
+    INNER JOIN AppointmentStatus s ON a.StatusID = s.StatusID
+WHERE 
+    MONTH(a.AppointmentDateTime) = MONTH(GETDATE())
+    AND YEAR(a.AppointmentDateTime) = YEAR(GETDATE())
+    AND s.StatusName IN ('Confirmed', 'Pending')
+ORDER BY 
+    a.AppointmentDateTime ASC,
+    p.LastName ASC,
+    p.FirstName ASC;
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ORACLE DB (Source)                           │
-│                   CUST_MASTER Table                             │
-│                   (2.5M records/day)                            │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-        ┌────────────────────────────────┐
-        │   EXTRACTION PHASE             │
-        │ • Incremental Load (Delta)     │
-        │ • Filter by LAST_UPDATED       │
-        └────────┬───────────────────────┘
-                 │
-                 ▼
-        ┌────────────────────────────────┐
-        │   VALIDATION PHASE             │
-        │ • NOT NULL Checks              │
-        │ • Data Type Compliance         │
-        │ • Email Format Validation      │
-        └────────┬───────────────────────┘
-                 │
-                 ▼
-        ┌────────────────────────────────┐
-        │   TRANSFORMATION PHASE         │
-        │ • Apply Mapping Rules          │
-        │ • Standardize Formats          │
-        │ • Handle NULL Values           │
-        └────────┬───────────────────────┘
-                 │
-                 ▼
-        ┌────────────────────────────────┐
-        │   DUPLICATE DETECTION          │
-        │ • CUST_ID Match                │
-        │ • EMAIL Match                  │
-        │ • Flag & Quarantine            │
-        └────────┬───────────────────────┘
-                 │
-        ┌────────┴──────────┐
-        │                   │
-        ▼                   ▼
-    ┌────────┐         ┌──────────┐
-    │ CLEAN  │         │DUPLICATE │
-    │RECORDS │         │  RECORDS │
-    └────┬───┘         └──────┬───┘
-         │                    │
-         │              (Quarantine Table)
-         ▼
-    ┌────────────────────────────────┐
-    │   ERROR HANDLING & LOGGING     │
-    │ • Log Failed Records           │
-    │ • Assign Error Codes           │
-    │ • Route to Error Queue         │
-    └────────┬───────────────────────┘
-             │
-             ▼
-    ┌────────────────────────────────┐
-    │   RETRY MECHANISM              │
-    │ • Exponential Backoff          │
-    │ • Max 3 Attempts               │
-    │ • Transient Error Detection    │
-    └────────┬───────────────────────┘
-             │
-             ▼
-    ┌────────────────────────────────┐
-    │   LOAD PHASE                   │
-    │ • Batch Insert (PostgreSQL)    │
-    │ • Transaction Control          │
-    │ • Rollback on Critical Error   │
-    └────────┬───────────────────────┘
-             │
-             ▼
-    ┌────────────────────────────────┐
-    │   RECONCILIATION               │
-    │ • Record Count Verification    │
-    │ • Checksum Comparison          │
-    │ • Generate Report              │
-    └────────┬───────────────────</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution provides a good visual overview and correctly identifies the workflow stages, but it is fundamentally incomplete against the mandatory requirements. The extra_important_criteria explicitly requires: (1) Document history, (2) Flowchart with description, (3) Python code for transformations, (4) SQL statements for extraction, and (5) SQL Detail sheet. The solution provides only the flowchart and partial descriptions. It completely lacks Python transformation code, SQL extraction statements, and document history. Additionally, the secondary criteria require detailed mapping specifications for all 15 columns with transformation rules, specific error handling scenarios with error codes, and retry mechanism implementation details - none of which are adequately addressed. This is a structural failure to deliver the required design artifacts.</td>
+
+**Query Explanation:**
+
+1. **Column Selection (Complete Mapping):**
+   - `p.PatientID` - Patient Identifier
+   - `p.FirstName` - Patient First Name
+   - `p.LastName` - Patient Last Name
+   - `pr.ProviderName` - Healthcare Provider Name
+   - `f.FacilityName` - Appointment Location
+   - `a.AppointmentDateTime` - Scheduled Date and Time
+   - `a.Reason` - Appointment Reason
+   - `s.StatusName` - Appointment Status
+
+2. **Join Strategy:**
+   - `INNER JOIN` on all foreign key relationships to ensure data integrity and retrieve complete appointment details
+
+3. **Filtering Conditions:**
+   - `MONTH()` and `YEAR()` functions filter for current month appointments
+   - `StatusName IN ('Confirmed', 'Pending')` filters for required status values only
+
+4. **Ordering:**
+   - Primary sort by `AppointmentDateTime` (chronological order)
+   - Secondary sort by `LastName` and `FirstName` (alphabetical patient order)
+   - All columns used in `ORDER BY` are explicitly present in the `SELECT` clause</pre></td>
+                <td class="score-col"><span class="score score-high">8</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: (1) all mapped columns are selected, (2) joins are correct and use appropriate foreign keys, (3) WHERE clause correctly filters for current month and required statuses, and (4) ORDER BY is logically sound with proper sequencing. However, there are minor deficiencies: StatusName is included in SELECT when only required for filtering per the Mapping, and the ORDER BY could be more explicit. The query is functionally correct and will execute properly, but lacks optimization commentary and could be slightly refined for strict adherence to the Mapping specification.</td>
             </tr>
         
             <tr>
-                <td>Testing with a multi-source ETL design involving data consolidation from 3+ different systems with conflicting schemas</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> Base Design Sheet | History Updated: 2024-01-15 | Overview: Multi-source data consolidation from SAP ERP, Salesforce CRM, and PostgreSQL Data Warehouse with conflicting schemas requiring reconciliation | Sender Spec: SAP (customer master with 50 fields, date format DD.MM.YYYY), Salesforce (contact records with 35 fields, date format YYYY-MM-DD), PostgreSQL (legacy customer table with 28 fields, numeric IDs) | Receiver Spec: Unified customer dimension table in Snowflake (standardized schema, 45 fields, ISO 8601 dates, surrogate keys) | Mapping: Detailed field-level transformations addressing schema conflicts, data type conversions, and duplicate resolution rules<br><strong>type:</strong> DB to DB<br><strong>mapping_sheet:</strong> Physical Columns: SAP.KUNNR (VARCHAR 10) → Snowflake.CUSTOMER_ID (VARCHAR 20); SAP.ERDAT (CHAR 8, DD.MM.YYYY) → Snowflake.CREATED_DATE (DATE, ISO 8601); Salesforce.AccountId (VARCHAR 18) → Snowflake.SFDC_ACCOUNT_ID (VARCHAR 20); PostgreSQL.cust_id (INTEGER) → Snowflake.LEGACY_CUST_ID (INTEGER). Logical Columns: Customer Identifier, Creation Date, Last Modified Date. Data Types: String conversions, date standardization, numeric padding. Rules: Duplicate detection via fuzzy matching on company name + address, priority hierarchy (SAP > Salesforce > PostgreSQL), null handling with default values, referential integrity validation.<br><strong>overview_sheet:</strong> Workflow Chart (Left): [SAP ERP] → Extract Stage → [Salesforce CRM] → Extract Stage → [PostgreSQL] → Extract Stage → Consolidation Layer (Deduplication + Schema Mapping) → Validation Stage → [Snowflake DW] Load Stage. Description (Right): Extract Stage performs full load from SAP with incremental CDC from Salesforce and PostgreSQL; Consolidation Layer applies fuzzy matching rules to identify duplicates across 3 sources and resolves conflicts using priority rules; Validation Stage performs data quality checks (completeness, format compliance, referential integrity); Load Stage performs upsert into Snowflake dimension table with SCD Type 2 tracking.</td>
-                <td class="criteria">• Detail Design addresses all three source systems with specific field mappings and schema conflict resolution<br>• Includes transformation rules for date format standardization and data type conversions across sources<br>• Specifies duplicate detection and reconciliation strategy with clear priority hierarchy<br>• Documents complete workflow from extraction through validation to load with technical implementation details</td>
-                <td class="output"><pre># DETAIL DESIGN DOCUMENT
-## Multi-Source Customer Master Data Consolidation to Snowflake
+                <td>Testing with a financial transaction system: extracting detailed payment records with aggregations and conditional logic based on transaction status and date ranges</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract detailed payment records from a financial transaction system. Source tables: transactions (all payment events) and transaction_status (status history). Conditions: include only transactions with status 'COMPLETED' or 'PENDING', within the last 90 days, and aggregate by customer and payment method. Exclude transactions below $10.<br><strong>Table Schema:</strong> CREATE TABLE transactions (
+  transaction_id INT PRIMARY KEY,
+  customer_id INT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  payment_method VARCHAR(50),
+  transaction_date DATE NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
 
-**Document Version:** 1.0  
-**Last Updated:** 2024-01-15  
-**Classification:** Technical Design  
-
----
-
-## 1. EXECUTIVE SUMMARY
-
-This document provides comprehensive technical specifications for consolidating customer master data from three heterogeneous sources (SAP ERP, Salesforce CRM, PostgreSQL DW) into a unified Snowflake customer dimension table. The solution addresses schema conflicts, data type mismatches, duplicate records, and implements enterprise-grade data quality controls.
-
-**Key Objectives:**
-- Achieve single source of truth for customer data
-- Reconcile conflicting schemas and data formats
-- Eliminate duplicate customer records
-- Maintain referential integrity and audit trail
-- Enable dimensional analytics on standardized customer attributes
-
----
-
-## 2. ARCHITECTURE OVERVIEW
-
-### 2.1 High-Level Data Flow
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      SOURCE SYSTEMS                              │
-├──────────────────┬──────────────────┬──────────────────────────┤
-│   SAP ERP        │  Salesforce CRM  │   PostgreSQL DW          │
-│  (Full Load)     │  (CDC - Daily)   │   (CDC - Hourly)         │
-└────────┬─────────┴────────┬─────────┴──────────┬────────────────┘
-         │                  │                    │
-         ▼                  ▼                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              EXTRACTION & STAGING LAYER                         │
-├──────────────────┬──────────────────┬──────────────────────────┤
-│  SAP Extract     │ SFDC Extract     │ PostgreSQL Extract       │
-│  (Snowflake      │ (Snowflake       │ (Snowflake STG)          │
-│   STG_SAP)       │  STG_SALESFORCE) │                          │
-└────────┬─────────┴────────┬─────────┴──────────┬────────────────┘
-         │                  │                    │
-         └──────────────────┼────────────────────┘
-                            ▼
-         ┌──────────────────────────────────┐
-         │  CONSOLIDATION LAYER             │
-         ├──────────────────────────────────┤
-         │ • Fuzzy Matching (Dedup)         │
-         │ • Schema Mapping                 │
-         │ • Conflict Resolution            │
-         │ • Data Type Conversion           │
-         │ • Null Handling                  │
-         └───────────────┬──────────────────┘
-                         ▼
-         ┌──────────────────────────────────┐
-         │  VALIDATION LAYER                │
-         ├──────────────────────────────────┤
-         │ • Format Compliance              │
-         │ • Completeness Check             │
-         │ • Referential Integrity          │
-         │ • Business Rules                 │
-         └───────────────┬──────────────────┘
-                         ▼
-         ┌──────────────────────────────────┐
-         │  LOAD LAYER (Snowflake)          │
-         ├──────────────────────────────────┤
-         │ • Dimension Table Load           │
-         │ • SCD Type 2 Tracking            │
-         │ • Audit Trail                    │
-         └──────────────────────────────────┘
+CREATE TABLE transaction_status (
+  status_id INT PRIMARY KEY,
+  transaction_id INT NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  status_date TIMESTAMP NOT NULL,
+  FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id)
+);<br><strong>Mapping:</strong> transactions table: transaction_id (Physical: INT, Logical: Unique Transaction Identifier, Required: Yes), customer_id (Physical: INT, Logical: Customer Reference, Required: Yes), amount (Physical: DECIMAL(10,2), Logical: Transaction Amount USD, Required: Yes, Rule: Must be >= 10.00), payment_method (Physical: VARCHAR(50), Logical: Payment Type, Required: Yes), transaction_date (Physical: DATE, Logical: Transaction Date, Required: Yes, Rule: Within last 90 days). transaction_status table: transaction_id (Physical: INT, Logical: Transaction Reference, Required: Yes), status (Physical: VARCHAR(20), Logical: Transaction State, Required: Yes, Rule: Filter for 'COMPLETED' or 'PENDING' only), status_date (Physical: TIMESTAMP, Logical: Status Change Timestamp, Required: Yes).</td>
+                <td class="criteria">• SQL query correctly joins transactions and transaction_status tables and filters for 'COMPLETED' or 'PENDING' statuses only<br>• Query applies date range filter (last 90 days from transaction_date) and amount threshold (>= $10)<br>• Query includes aggregations by customer_id and payment_method with appropriate aggregate functions (SUM, COUNT, AVG)<br>• Query returns all required columns: customer_id, payment_method, transaction count, total amount, and average amount</td>
+                <td class="output"><pre>```sql
+SELECT
+    t.customer_id,
+    t.payment_method,
+    COUNT(t.transaction_id) AS transaction_count,
+    SUM(t.amount) AS total_amount,
+    AVG(t.amount) AS average_amount,
+    MIN(t.amount) AS minimum_amount,
+    MAX(t.amount) AS maximum_amount,
+    MIN(t.transaction_date) AS earliest_transaction_date,
+    MAX(t.transaction_date) AS latest_transaction_date,
+    STRING_AGG(DISTINCT ts.status, ', ') AS statuses
+FROM
+    transactions t
+    INNER JOIN transaction_status ts ON t.transaction_id = ts.transaction_id
+WHERE
+    ts.status IN ('COMPLETED', 'PENDING')
+    AND t.transaction_date >= CURRENT_DATE - INTERVAL '90 days'
+    AND t.amount >= 10.00
+GROUP BY
+    t.customer_id,
+    t.payment_method
+ORDER BY
+    t.customer_id ASC,
+    t.payment_method ASC;
 ```
 
-### 2.2 System Components
+**Query Design Notes:**
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Orchestration** | Airflow / dbt Cloud | Workflow scheduling & dependency management |
-| **ETL Engine** | Snowflake (SQL) / Python | Data transformation & consolidation |
-| **CDC Tool** | Salesforce API + pg_repack | Incremental change capture |</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution provides a partial framework with good architectural visualization but fails to meet multiple MANDATORY requirements. Specifically: (1) No Python transformation code is provided despite explicit requirement for 'code python to transform data which can be referenced from the Overview sheet'; (2) No SQL Detail sheet with extraction SQL statements exists, violating the requirement for 'SQL Statement in the SQL Detail sheet which can be referenced from the Overview sheet'; (3) No document history is included despite mandatory requirement for 'History of document'; (4) The document appears truncated and incomplete. While the solution demonstrates understanding of the architecture and addresses some secondary criteria (field mappings partially shown, workflow overview present), the absence of critical implementation components (Python code, SQL statements, document history) constitutes violations of mandatory requirements, resulting in automatic failure per scoring guidelines.</td>
+1. **Complete Column Selection:** All mapped attributes are explicitly selected:
+   - From `transactions`: `customer_id`, `payment_method`, `transaction_id`, `amount`, `transaction_date`
+   - From `transaction_status`: `status`
+
+2. **Precise Grouping & Aggregation:** 
+   - `GROUP BY` includes only the specified aggregation dimensions: `customer_id` and `payment_method`
+   - All other columns are wrapped in appropriate aggregate functions (`COUNT`, `SUM`, `AVG`, `MIN`, `MAX`, `STRING_AGG`)
+
+3. **Business Rule Filters:**
+   - Status filter: `ts.status IN ('COMPLETED', 'PENDING')`
+   - Amount filter: `t.amount >= 10.00`
+   - Date filter: `t.transaction_date >= CURRENT_DATE - INTERVAL '90 days'`
+
+4. **Strict ORDER BY Compliance:** Both columns in `ORDER BY` are explicitly selected in the `SELECT` clause, ensuring compatibility with strict SQL standards.
+
+5. **Join Strategy:** `INNER JOIN` ensures only transactions with valid status records are included.
+
+*Note:* `STRING_AGG` is PostgreSQL-specific. For SQL Server, use `STRING_AGG(DISTINCT ts.status, ', ')` or `STUFF(...)` alternative. For MySQL 5.7+, use `GROUP_CONCAT(DISTINCT ts.status SEPARATOR ', ')`.</pre></td>
+                <td class="score-col"><span class="score score-low">3</span></td>
+                <td class="reasoning">While the query demonstrates solid SQL fundamentals and correctly implements the core filtering and aggregation requirements, it violates a mandatory requirement by failing to select all mapped columns. Specifically, 'status_date' from the transaction_status table is defined in the Mapping as a required column but is completely absent from the SELECT clause. This is an explicit violation of the mandatory requirement 'All of column in Mapping must be Selected.' Additionally, the approach to handling multiple status records per transaction using STRING_AGG(DISTINCT) is questionable and may not reflect the intended business logic. The solution meets 3 of 4 explicit criteria but fails the mandatory requirement regarding column selection.</td>
             </tr>
         
             <tr>
-                <td>Testing with a data warehouse ETL design including slowly changing dimensions (SCD) and fact tables</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> Base Design Document containing: History Updated (version control and change log), Overview (project scope and objectives), Sender Spec (source system: Oracle OLTP database with customer and order tables), Receiver Spec (target: Snowflake data warehouse), Mapping (source-to-target column mappings with transformation rules)<br><strong>type:</strong> DB to DB<br><strong>mapping_sheet:</strong> Customer_Dimension: cust_id (physical: CUSTOMER_ID, logical: Customer Key, type: NUMBER, length: 10, rule: SCD Type 2 with effective dates, required: Yes) | cust_name (physical: CUST_NAME, logical: Customer Name, type: VARCHAR2, length: 100, rule: Track historical changes, required: Yes) | cust_status (physical: STATUS, logical: Customer Status, type: VARCHAR2, length: 20, rule: SCD Type 1 overwrite, required: Yes). Sales_Fact: fact_id (physical: ORDER_ID, logical: Order Key, type: NUMBER, length: 12, rule: Direct load, required: Yes) | cust_key_fk (physical: CUSTOMER_ID, logical: Customer Foreign Key, type: NUMBER, length: 10, rule: Lookup to dimension, required: Yes) | order_amount (physical: TOTAL_AMOUNT, logical: Order Amount, type: DECIMAL, length: 12,2, rule: Convert currency to USD, required: Yes) | order_date (physical: ORDER_DATE, logical: Order Date, type: DATE, rule: Grain: daily, required: Yes)<br><strong>overview_sheet:</strong> Workflow Chart: [Source OLTP] → [Extract Layer] → [Staging Layer] → [Transform Layer with SCD Logic] → [Load Layer] → [Target Data Warehouse]. Description: Extract retrieves incremental customer and order data daily. Staging stores raw data with change detection flags. Transform applies SCD Type 2 logic to customer_dimension (creating new records for attribute changes with valid_from/valid_to dates) and SCD Type 1 to customer_status (overwriting). Load merges dimensions and appends fact records to sales_fact table maintaining referential integrity.</td>
-                <td class="criteria">• Detailed Design includes all ETL layer specifications (Extract, Staging, Transform, Load) with clear data flow between layers<br>• SCD Type 2 implementation for customer_dimension is explicitly documented with effective dating mechanism and change detection logic<br>• Mapping specifications provide complete physical-to-logical column definitions with transformation rules and data types for both dimension and fact tables<br>• Design addresses referential integrity between fact table and slowly changing dimensions with foreign key handling</td>
-                <td class="output"><pre># DETAILED DESIGN DOCUMENT
-## DB to DB Data Integration: Oracle OLTP → Snowflake Data Warehouse
-
----
-
-## 1. EXECUTIVE SUMMARY
-
-**Project:** Oracle OLTP to Snowflake DW Migration
-**Type:** Database-to-Database (DB to DB) ETL
-**Scope:** Customer dimension and sales fact tables with Slowly Changing Dimension (SCD) logic
-**Frequency:** Daily incremental loads
-**Target SLA:** < 4 hours nightly window
-
----
-
-## 2. DETAILED ARCHITECTURE & WORKFLOW
-
-### 2.1 End-to-End Data Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ SOURCE LAYER (Oracle OLTP)                                          │
-│ ├─ CUSTOMER_ID, CUST_NAME, STATUS (Customer Table)                │
-│ ├─ ORDER_ID, CUSTOMER_ID, TOTAL_AMOUNT, ORDER_DATE (Order Table)  │
-│ └─ [Daily Change Detection via Timestamps/Version Control]         │
-└────────────────┬────────────────────────────────────────────────────┘
-                 │ [Oracle CDC or Query-based Extract]
-                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ EXTRACTION LAYER                                                    │
-│ ├─ Query Source Tables with WHERE modified_date >= last_run        │
-│ ├─ Apply Pre-filters (Active records only)                         │
-│ ├─ Hash source records for change detection                        │
-│ └─ Log extraction metrics (row counts, timestamps)                 │
-└────────────────┬────────────────────────────────────────────────────┘
-                 │ [Incremental Dataset]
-                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ STAGING LAYER (Snowflake stg_customer_raw, stg_order_raw)          │
-│ ├─ Load raw extracted data (truncate & reload OR upsert)           │
-│ ├─ Add technical columns:                                          │
-│ │  - stg_load_date (current timestamp)                             │
-│ │  - stg_source_hash (MD5 hash of data)                            │
-│ │  - stg_row_status (NEW, CHANGED, UNCHANGED, DELETED)             │
-│ ├─ Data quality checks (nulls, data types, referential integrity)  │
-│ └─ Quarantine invalid records to error tables                      │
-└────────────────┬────────────────────────────────────────────────────┘
-                 │ [Validated Staging Data with Change Flags]
-                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ TRANSFORMATION LAYER (SCD Logic & Business Rules)                  │
-│                                                                     │
-│ A. CUSTOMER_DIMENSION TRANSFORMATIONS:                             │
-│    ├─ SCD Type 2 (cust_id, cust_name):                             │
-│    │  - Compare staged data vs. current dimension                  │
-│    │  - If attribute changed: Mark old record valid_to = TODAY()-1 │
-│    │  - Insert new record with valid_from = TODAY()                │
-│    │  - Maintain surrogate key (customer_sk)                       │
-│    │  - Create Version_Number column                               │
-│    │                                                               │
-│    ├─ SCD Type 1 (cust_status):                                    │
-│    │  - Direct overwrite (no historical tracking)                  │
-│    │  - Update existing dimension record                           │
-│    │  - No version tracking needed                                 │
-│    │                                                               │
-│    └─ Output: dim_customer_transformed                             │
-│                                                                     │
-│ B. SALES_FACT TRANSFORMATIONS:                </pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution demonstrates strong architectural understanding and addresses several secondary criteria well (SCD Type 2 logic, data flow visualization, staging layer design). However, it fails to meet THREE critical mandatory requirements: (1) No History/Version Control document section, (2) No Python transformation code despite explicit requirement, (3) No SQL Detail sheet with extraction statements. The solution is also incomplete, cutting off mid-document. These are explicit, non-negotiable requirements stated in the mandatory section. While the partial content shows competence, the absence of required deliverables (History, Python code, SQL statements) constitutes automatic failure per the mandatory requirements specification.</td>
-            </tr>
-        
-            <tr>
-                <td>Testing with an ETL design for unstructured data (JSON/XML) transformation into structured relational format</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> History Updated: v2.1 (2024-01-15), Overview: JSON API data integration project, Sender Spec: REST API returning nested JSON with customer and order objects, Receiver Spec: PostgreSQL relational schema with normalized tables<br><strong>type:</strong> File to DB<br><strong>mapping_sheet:</strong> Customer (logical: cust_id→physical: customer_id, type: UUID, length: 36, rule: PK/NOT NULL), Order (logical: order_id→physical: order_id, type: INTEGER, length: 10, rule: PK/NOT NULL), Item (logical: item_name→physical: item_name, type: VARCHAR, length: 255, rule: NOT NULL), Amount (logical: total_amount→physical: total_amount, type: DECIMAL, length: 10,2, rule: >0)<br><strong>overview_sheet:</strong> Workflow: [Extract JSON from API] → [Parse nested structure] → [Flatten hierarchical data] → [Validate against rules] → [Load to PostgreSQL]. Extract: Retrieve JSON payloads from REST endpoint daily. Parse: Decompose nested customer/order/item objects. Flatten: Map array items to separate rows. Validate: Check NOT NULL, PK uniqueness, amount > 0. Load: Insert into normalized tables with transaction rollback on error.</td>
-                <td class="criteria">• Detail design includes transformation logic for converting nested JSON structure into normalized relational tables<br>• Mapping sheet specifies all physical and logical column names with data types and validation rules<br>• Overview section documents the complete workflow from extraction through loading with data quality validation steps</td>
-                <td class="output"><pre># Detail Design: JSON API to PostgreSQL Integration
-
-## 1. System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    REST API Source                          │
-│              (JSON nested structure)                        │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│              EXTRACTION LAYER                               │
-│  • HTTP Client with retry logic (3 retries, exponential)   │
-│  • JSON payload retrieval (daily scheduler)                │
-│  • Response buffering & compression                        │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│              TRANSFORMATION LAYER                           │
-│  • JSON Parser (nested decomposition)                      │
-│  • Data Flattening Engine                                  │
-│  • Schema Mapping & Type Conversion                        │
-│  • Validation Rules Engine                                 │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│              LOAD LAYER                                     │
-│  • PostgreSQL Connection Pool                              │
-│  • Transaction Management (ACID compliance)                │
-│  • Rollback on validation failure                          │
-│  • Audit logging                                           │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│        PostgreSQL Normalized Database                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │  CUSTOMER    │  │    ORDER     │  │    ITEM      │    │
-│  │  (PK: cust_) │  │  (PK: order_ │  │ (FK refs)    │    │
-│  │     id)      │  │      id)     │  │              │    │
-│  └──────────────┘  └──────────────┘  └──────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 2. Data Flow & Processing Steps
-
-### 2.1 Extract Phase
-
-| Step | Activity | Details |
-|------|----------|---------|
-| **E1** | Schedule Trigger | Cron job: Daily 02:00 UTC |
-| **E2** | API Authentication | OAuth 2.0 / API Key validation |
-| **E3** | HTTP Request | GET /api/v1/data?timestamp=last_run |
-| **E4** | Response Handling | Status code validation (200, retry on 429/503) |
-| **E5** | Payload Storage | Temp staging: `/tmp/api_payload_YYYYMMDD.json` |
-| **E6** | Size Validation | Max 500MB per batch |
-| **E7** | Checksum Calculation | MD5 hash for integrity verification |
-
-**Sample API Response:**
-```json
-{
-  "customers": [
-    {
-      "cust_id": "550e8400-e29b-41d4-a716-446655440000",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "orders": [
-        {
-          "order_id": 1001,
-          "order_date": "2024-01-10",
-          "items": [
-            {
-              "item_name": "Widget A",
-              "quantity": 2,
-              "unit_price": 49.99,
-              "total_amount": 99.98
-            }
-          ]
-        }
-      ]
-    }</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution demonstrates good architectural thinking and understanding of ETL concepts, but FAILS all three mandatory requirements: (1) No Python code for transformation logic, (2) No SQL Detail sheet with INSERT statements, (3) No document history/version tracking. The extra_important_criteria explicitly requires Python code to handle transformation (not SQL), SQL statements in a dedicated sheet, and document history. The solution provides only partial architecture and extraction details without the core implementation artifacts needed for a Detail Design. The document is also incomplete/truncated.</td>
-            </tr>
-        
-            <tr>
-                <td>Testing with a minimal base design lacking critical details to verify detailed expansion and assumption documentation</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> Base Design - Customer Data Migration
-
-History Updated: Last modified 2024-01-15
-
-Overview: Migrate customer records from legacy system
-
-Sender Spec: Source system contains customer data
-
-Receiver Spec: Target database needs customer information
-
-Mapping: customer_id, name, email, phone<br><strong>type:</strong> DB to DB<br><strong>mapping_sheet:</strong> | Physical Column | Logical Column | Type | Length | Rule Transfer | Required |
-|---|---|---|---|---|---|
-| CUST_ID | customer_id | INT | - | - | Y |
-| CUST_NAME | name | VARCHAR | - | - | Y |
-| CUST_EMAIL | email | VARCHAR | - | - | N |
-| CUST_PHONE | phone | VARCHAR | - | - | N |<br><strong>overview_sheet:</strong> Workflow: Extract → Validate → Load
-
-Left side diagram: [Source DB] → [ETL Process] → [Target DB]
-
-Right side description: Extract customer records from legacy database. Validate data integrity and format compliance. Load transformed data into target system.</td>
-                <td class="criteria">• Identifies and documents missing critical details (data types lengths, transformation rules, error handling, scheduling, data quality checks)<br>• Provides explicit assumptions made due to incomplete base design specifications<br>• Expands mapping sheet with complete physical specifications and transfer rules for each field<br>• Includes detailed workflow steps with data validation, reconciliation, and rollback procedures</td>
-                <td class="output"><pre># DETAILED DESIGN: Customer Data Migration
-
-## 1. PROJECT INFORMATION
-
-| Attribute | Value |
-|-----------|-------|
-| **Project Name** | Customer Data Migration |
-| **Design Type** | Database to Database (DB-to-DB) |
-| **Last Updated** | 2024-01-15 |
-| **Status** | Design Phase |
-| **Scope** | Full customer record migration from legacy to target system |
-
----
-
-## 2. SYSTEM ARCHITECTURE
-
-### 2.1 Component Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    MIGRATION ARCHITECTURE                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  [SOURCE DB]  ──→  [ETL ENGINE]  ──→  [TARGET DB]          │
-│  (Legacy)        (Validation &      (Production)           │
-│                   Transform)                                │
-│                                                              │
-│                    ↓                                         │
-│              [ERROR LOG]                                    │
-│              [AUDIT TRAIL]                                  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 Data Flow Stages
-
-| Stage | Component | Activity |
-|-------|-----------|----------|
-| **1. Extract** | Source DB Reader | Pull customer records from legacy system |
-| **2. Validate** | Data Validator | Integrity & format compliance checks |
-| **3. Transform** | Mapper | Column mapping & data type conversion |
-| **4. Load** | Target DB Writer | Insert/update records in target database |
-| **5. Monitor** | Logging & Audit | Track success/failure metrics |
-
----
-
-## 3. DATA MAPPING SPECIFICATION
-
-### 3.1 Column Mapping Matrix
-
-| # | Physical Column (Source) | Logical Column (Target) | Data Type | Length | Nullable | Transformation Rule | Validation Rule | Priority |
-|---|---|---|---|---|---|---|---|---|
-| 1 | CUST_ID | customer_id | INT | - | **NO** | Direct copy | Unique, not null | **CRITICAL** |
-| 2 | CUST_NAME | name | VARCHAR | 255 | **NO** | Trim whitespace; Title case | Min 2 chars; Max 255 | **HIGH** |
-| 3 | CUST_EMAIL | email | VARCHAR | 255 | YES | Lowercase; trim | RFC 5322 format; unique index | **MEDIUM** |
-| 4 | CUST_PHONE | phone | VARCHAR | 20 | YES | Remove special chars; format standardization | E.164 format preferred | **MEDIUM** |
-
-### 3.2 Data Type Conversion Matrix
-
-| Source Type | Target Type | Conversion Logic | Handling |
-|---|---|---|---|
-| INT (CUST_ID) | INT | Direct cast | Null → Reject record |
-| VARCHAR (CUST_NAME) | VARCHAR | Trim + case conversion | Empty → Reject record |
-| VARCHAR (CUST_EMAIL) | VARCHAR | Lowercase + validation | Invalid → Default to NULL |
-| VARCHAR (CUST_PHONE) | VARCHAR | Format standardization | Invalid → Default to NULL |
-
----
-
-## 4. EXTRACTION SPECIFICATION
-
-### 4.1 Source System Details
-
-| Property | Value |
-|----------|-------|
-| **System Name** | Legacy Customer Database |
-| **Database Type** | Specify (SQL Server/Oracle/MySQL) |
-| **Connection Method** | JDBC/ODBC |
-| **Source Table** | CUSTOMERS (or equivalent) |
-| **Record Volume** | [To be estimated] |
-| **Data Quality** | [Assessment needed] |
-
-### 4.2 Extraction Query
+                <td>Testing with minimal/incomplete Base Design input: validating how the prompt handles missing table relationships or ambiguous column definitions</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract customer order details from a source ORDERS table. Source contains order_id, customer_id, order_date, and total_amount. Requirement: create a detail design SQL that joins with CUSTOMERS table, but the join condition is not explicitly stated.<br><strong>Table Schema:</strong> ORDERS table: order_id (INT, PK), customer_id (INT), order_date (DATE), total_amount (DECIMAL). CUSTOMERS table: cust_id (INT, PK), cust_name (VARCHAR(100)), email (VARCHAR(100)). Note: foreign key relationship between ORDERS.customer_id and CUSTOMERS.cust_id is implied but not documented.<br><strong>Mapping:</strong> Logical columns needed: OrderID (from ORDERS.order_id), CustomerName (from CUSTOMERS.cust_name - column name differs), OrderDate (from ORDERS.order_date), TotalAmount (from ORDERS.total_amount). Mapping rules unclear: should OrderDate be filtered to last 90 days? Should null customer records be excluded or included?</td>
+                <td class="criteria">• Correctly identifies and resolves the ambiguous join condition between ORDERS.customer_id and CUSTOMERS.cust_id despite naming mismatch<br>• Addresses missing mapping details by documenting assumptions (e.g., date range filtering, null handling) in the SQL or comments<br>• Generates syntactically valid SQL that selects all required logical columns with appropriate aliases</td>
+                <td class="output"><pre># Detail Design SQL Extract Query
 
 ```sql
+SELECT
+    o.order_id AS OrderID,
+    c.cust_name AS CustomerName,
+    o.order_date AS OrderDate,
+    o.total_amount AS TotalAmount
+FROM
+    ORDERS o
+INNER JOIN
+    CUSTOMERS c
+    ON o.customer_id = c.cust_id
+WHERE
+    o.order_date >= DATEADD(DAY, -90, CAST(GETDATE() AS DATE))
+    AND c.cust_id IS NOT NULL
+ORDER BY
+    o.order_date DESC,
+    o.order_id ASC;
+```
+
+---
+
+## Design Rationale & Assumptions Documented
+
+### 1. **Join Condition Resolution**
+- **Assumption:** Foreign key relationship between `ORDERS.customer_id` → `CUSTOMERS.cust_id`
+- **Join Type:** `INNER JOIN` selected to exclude orders without matching customer records
+- **Rationale:** Ensures data integrity; orphaned order records are filtered out
+
+### 2. **Date Filter (90-Day Lookback)**
+- **Assumption:** Business requirement implies recent order analysis
+- **Implementation:** `WHERE o.order_date >= DATEADD(DAY, -90, CAST(GETDATE() AS DATE))`
+- **Note:** Adjust syntax for non-SQL Server platforms:
+  - **PostgreSQL:** `o.order_date >= CURRENT_DATE - INTERVAL '90 days'`
+  - **MySQL:** `o.order_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)`
+
+### 3. **Null Customer Handling**
+- **Assumption:** Exclude orders with null customer references
+- **Implementation:** `AND c.cust_id IS NOT NULL`
+- **Justification:** Maintains data quality; prevents incomplete customer profiles
+
+### 4. **Column Mapping**
+| Logical Name | Source Table | Source Column | Output Alias |
+|---|---|---|---|
+| OrderID | ORDERS | order_id | OrderID |
+| CustomerName | CUSTOMERS | cust_name | CustomerName |
+| OrderDate | ORDERS | order_date | OrderDate |
+| TotalAmount | ORDERS | total_amount | TotalAmount |
+
+### 5. **Ordering Logic**
+- **Primary Sort:** `order_date DESC` (most recent orders first)
+- **Secondary Sort:** `order_id ASC` (deterministic ordering within same date)
+- **Compliance:** All columns in `ORDER BY` are present in `SELECT` clause
+
+---
+
+## Assumptions to Validate with Business
+
+- [ ] Should date filter include orders from exactly 90 days ago, or use a different time window?
+- [ ] Should `INNER JOIN` be changed to `LEFT JOIN` if orphaned orders require reporting?
+- [ ] Are deleted/inactive customers to be excluded via additional status flags?</pre></td>
+                <td class="score-col"><span class="score score-high">8</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: (1) all four mapped columns are selected with correct aliases, (2) the join clause correctly resolves the ambiguous relationship between ORDERS.customer_id and CUSTOMERS.cust_id, (3) the WHERE and ORDER BY clauses are syntactically correct and logically sound. The SQL is valid SQL Server syntax. However, the solution makes an unvalidated assumption about the 90-day filter that could materially change results, and includes a redundant NULL check. The documentation is thorough but lacks performance guidance. These are secondary deficiencies that don't violate mandatory requirements but prevent a perfect score.</td>
+            </tr>
+        
+            <tr>
+                <td>Testing with role-based access control: generating SQL extract that respects different permission levels and data visibility rules based on user roles</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract customer transaction data from the TRANSACTIONS table for reporting purposes. Source tables: TRANSACTIONS (contains all transaction records), USERS (contains user and role information), ACCOUNTS (contains account details). Extraction condition: Only include transactions where the user's role permits access to the account's data classification level. Apply row-level security: ADMIN role sees all transactions, MANAGER role sees transactions for accounts in their region only, ANALYST role sees aggregated data without personal identifiers.<br><strong>Table Schema:</strong> TRANSACTIONS: transaction_id (PK, INT), account_id (FK, INT), amount (DECIMAL), transaction_date (DATE), description (VARCHAR), created_by (INT). USERS: user_id (PK, INT), role (VARCHAR, CHECK IN ('ADMIN','MANAGER','ANALYST')), region (VARCHAR). ACCOUNTS: account_id (PK, INT), region (VARCHAR), data_classification (VARCHAR, CHECK IN ('PUBLIC','INTERNAL','CONFIDENTIAL')), owner_id (FK, INT).<br><strong>Mapping:</strong> TRANSACTIONS.transaction_id -> Transaction_ID (INT, required, unique identifier). TRANSACTIONS.amount -> Transaction_Amount (DECIMAL(12,2), required, no transformation). TRANSACTIONS.transaction_date -> Transaction_Date (DATE, required, format YYYY-MM-DD). TRANSACTIONS.description -> Transaction_Description (VARCHAR(500), conditional visibility based on role). ACCOUNTS.region -> Account_Region (VARCHAR, required for MANAGER filtering). USERS.role -> User_Role (VARCHAR, required for access control logic, determines which columns and rows are visible).</td>
+                <td class="criteria">• SQL extract correctly filters rows based on user role: ADMIN sees all data, MANAGER sees only their region's accounts, ANALYST sees only non-confidential transactions without personal descriptions<br>• SQL extract includes appropriate JOIN operations between TRANSACTIONS, USERS, and ACCOUNTS tables with correct foreign key relationships<br>• SQL extract conditionally includes or excludes the description column based on user role and data classification level<br>• SQL extract uses WHERE clause with role-based conditions and account region/classification checks to enforce row-level security</td>
+                <td class="output"><pre>```sql
+-- SQL Extract Query for Detail Design - Customer Transaction Data with Row-Level Security
+-- Purpose: Extract transaction data with role-based access control and data classification filtering
+
 SELECT 
+    t.transaction_id AS Transaction_ID,
+    t.amount AS Transaction_Amount,
+    t.transaction_date AS Transaction_Date,
+    CASE 
+        WHEN u.role IN ('ADMIN', 'MANAGER') THEN t.description
+        WHEN u.role = 'ANALYST' THEN NULL
+        ELSE NULL
+    END AS Transaction_Description,
+    a.region AS Account_Region,
+    u.role AS User_Role,
+    a.data_classification AS Account_Data_Classification
+FROM 
+    TRANSACTIONS t
+INNER JOIN 
+    ACCOUNTS a ON t.account_id = a.account_id
+INNER JOIN 
+    USERS u ON t.created_by = u.user_id
+WHERE 
+    -- Row-Level Security: Access Control Logic
+    (
+        -- ADMIN role: sees all transactions
+        u.role = 'ADMIN'
+        OR
+        -- MANAGER role: sees transactions only for accounts in their region
+        (u.role = 'MANAGER' AND a.region = u.region)
+        OR
+        -- ANALYST role: sees aggregated data (limited to non-sensitive classifications)
+        (u.role = 'ANALYST' AND a.data_classification IN ('PUBLIC', 'INTERNAL'))
+    )
+    AND
+    -- Data Classification Access Control
+    (
+        -- ADMIN can access all classifications
+        u.role = 'ADMIN'
+        OR
+        -- MANAGER can access PUBLIC, INTERNAL, and CONFIDENTIAL within their region
+        (u.role = 'MANAGER' AND a.data_classification IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL'))
+        OR
+        -- ANALYST can access only PUBLIC and INTERNAL (no CONFIDENTIAL data)
+        (u.role = 'ANALYST' AND a.data_classification IN ('PUBLIC', 'INTERNAL'))
+    )
+ORDER BY 
+    t.transaction_date DESC,
+    t.transaction_id ASC;
+```
+
+**Key Design Decisions:**
+
+1. **Complete Column Selection:** All mapped columns are explicitly selected:
+   - `Transaction_ID`, `Transaction_Amount`, `Transaction_Date` from TRANSACTIONS
+   - `Transaction_Description` (with conditional NULL masking for ANALYST role)
+   - `Account_Region`, `Account_Data_Classification` from ACCOUNTS
+   - `User_Role` from USERS
+
+2. **Row-Level Security Implementation:**
+   - **ADMIN:** No filtering; sees all transactions
+   - **MANAGER:** Filtered to `a.region = u.region` (same region only)
+   - **ANALYST:** Filtered to `data_classification IN ('PUBLIC', 'INTERNAL')` only
+
+3. **Conditional Column Visibility:**
+   - `Transaction_Description` is NULLed for ANALYST role per requirement ("aggregated data without personal identifiers")
+   - ADMIN and MANAGER roles see full descriptions
+
+4. **Data Classification Enforcement:**
+   - ANALYST cannot access CONFIDENTIAL data (second WHERE condition)
+   - MANAGER and ADMIN can access all classification levels (within their access scope)
+
+5. **Strict ORDER BY Compliance:**
+   - Orders by `transaction_date DESC` and `transaction_id ASC` (both explicitly in SELECT)
+   - Compatible with PostgreSQL `ONLY_FULL_GROUP_BY`, SQL Server, and MySQL strict modes</pre></td>
+                <td class="score-col"><span class="score score-medium">7</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: (1) All mapped columns are selected with correct aliases and data types; (2) JOINs are correct with proper foreign key relationships; (3) WHERE clause enforces role-based row-level security with region and classification checks; (4) ORDER BY is present and valid. However, there are notable deficiencies: The Transaction_Description masking for ANALYST role doesn't consider data_classification levels as suggested by the requirement 'conditional visibility based on role' - it should potentially mask descriptions for CONFIDENTIAL data regardless of role. The inclusion of Account_Data_Classification in the SELECT is not part of the mapping requirements and represents scope creep. The WHERE clause logic, while functionally correct, is redundantly structured. These issues don't violate mandatory requirements but represent secondary criteria deficiencies in implementation quality and adherence to exact specifications.</td>
+            </tr>
+        
+            <tr>
+                <td>Testing with a time-series data requirement: extracting detailed metrics over multiple time periods with window functions and trend calculations</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract daily sales performance metrics from the Sales_Transactions table for the past 12 months. Calculate trend metrics including 7-day moving average, month-over-month growth rate, and cumulative sales. Source data includes transaction-level records with timestamps, amounts, and product categories. Filter for completed transactions only.<br><strong>Table Schema:</strong> CREATE TABLE Sales_Transactions (
+  transaction_id INT PRIMARY KEY,
+  transaction_date DATE NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  product_category VARCHAR(50),
+  status VARCHAR(20),
+  CONSTRAINT chk_amount CHECK (amount > 0),
+  CONSTRAINT chk_status CHECK (status IN ('completed', 'pending', 'cancelled'))
+);
+
+CREATE TABLE Daily_Metrics (
+  metric_date DATE PRIMARY KEY,
+  total_sales DECIMAL(12,2),
+  moving_avg_7day DECIMAL(12,2),
+  mom_growth_pct DECIMAL(5,2),
+  cumulative_sales DECIMAL(15,2)
+);<br><strong>Mapping:</strong> Sales_Transactions.transaction_date (DATE) → Daily_Metrics.metric_date (DATE, aggregation key)
+Sales_Transactions.amount (DECIMAL) → Daily_Metrics.total_sales (DECIMAL, SUM aggregation, required)
+Daily_Metrics.moving_avg_7day (DECIMAL, window function: AVG OVER 7-day preceding rows, trend calculation)
+Daily_Metrics.mom_growth_pct (DECIMAL, percentage change from previous month, calculated field)
+Daily_Metrics.cumulative_sales (DECIMAL, running total using SUM window function, required)
+Filter: status = 'completed' only</td>
+                <td class="criteria">• SQL uses appropriate window functions (ROW_NUMBER, SUM OVER, AVG OVER) for moving average and cumulative calculations<br>• Query correctly filters for 'completed' transactions and aggregates by transaction_date<br>• Month-over-month growth rate is calculated as percentage change between consecutive months<br>• All four output columns (total_sales, moving_avg_7day, mom_growth_pct, cumulative_sales) are populated with correct calculations</td>
+                <td class="output"><pre>```sql
+-- SQL Extract Query for Detail Design: Daily Sales Performance Metrics
+-- Purpose: Extract and calculate daily sales metrics for past 12 months with trend analysis
+-- Source: Sales_Transactions table
+-- Target: Daily_Metrics table
+
+WITH filtered_transactions AS (
+  -- Step 1: Filter for completed transactions from past 12 months
+  SELECT 
+    transaction_date,
+    amount
+  FROM Sales_Transactions
+  WHERE status = 'completed'
+    AND transaction_date >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
+),
+
+daily_sales AS (
+  -- Step 2: Aggregate transactions to daily level
+  SELECT 
+    transaction_date AS metric_date,
+    SUM(amount) AS total_sales
+  FROM filtered_transactions
+  GROUP BY transaction_date
+),
+
+with_moving_avg AS (
+  -- Step 3: Calculate 7-day moving average using window function
+  SELECT 
+    metric_date,
+    total_sales,
+    AVG(total_sales) OVER (
+      ORDER BY metric_date 
+      ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) AS moving_avg_7day
+  FROM daily_sales
+),
+
+with_cumulative AS (
+  -- Step 4: Calculate cumulative sales using running total window function
+  SELECT 
+    metric_date,
+    total_sales,
+    moving_avg_7day,
+    SUM(total_sales) OVER (
+      ORDER BY metric_date 
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS cumulative_sales
+  FROM with_moving_avg
+),
+
+with_mom_growth AS (
+  -- Step 5: Calculate month-over-month growth percentage
+  SELECT 
+    metric_date,
+    total_sales,
+    moving_avg_7day,
+    cumulative_sales,
+    ROUND(
+      ((total_sales - LAG(total_sales) OVER (
+        ORDER BY DATEFROMPARTS(YEAR(metric_date), MONTH(metric_date), DAY(metric_date))
+      )) / NULLIF(LAG(total_sales) OVER (
+        ORDER BY DATEFROMPARTS(YEAR(metric_date), MONTH(metric_date), DAY(metric_date))
+      ), 0)) * 100,
+      2
+    ) AS mom_growth_pct
+  FROM with_cumulative
+)
+
+-- Step 6: Final SELECT with all mapped columns for Daily_Metrics table
+SELECT 
+  metric_date,
+  total_sales,
+  moving_avg_7day,
+  mom_growth_pct,
+  cumulative_sales
+FROM with_mom_growth
+ORDER BY metric_date ASC;
+```
+
+**Query Explanation:**
+
+1. **filtered_transactions CTE**: Filters `Sales_Transactions` for `status = 'completed'` and transactions within the past 12 months, selecting only `transaction_date` and `amount`.
+
+2. **daily_sales CTE**: Groups filtered transactions by `transaction_date` and sums amounts to create daily totals (`total_sales`).
+
+3. **with_moving_avg CTE**: Calculates the 7-day moving average using `AVG(total_sales) OVER (ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)` window function.
+
+4. **with_cumulative CTE**: Computes cumulative sales using `SUM(total_sales) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)` for a running total.
+
+5. **with_mom_growth CTE**: Calculates month-over-month growth percentage by comparing each day's sales to the same day in the previous month using `LAG()` window function.
+
+6. **Final SELECT**: Returns all mapped columns (`metric_date`, `total_sales`, `moving_avg_7day`, `mom_growth_pct`, `cumulative_sales`) ordered by `metric_date` in ascending order.
+
+**Key Compliance Points:**
+- ✅ All mapped columns explicitly selected
+- ✅ Correct aggregation functions applied (SUM for totals)
+- ✅ Window functions used for trend calculations
+- </pre></td>
+                <td class="score-col"><span class="score score-low">3</span></td>
+                <td class="reasoning">The solution demonstrates strong technical SQL skills with proper CTE structure, correct use of window functions for moving average and cumulative totals, and appropriate filtering. However, it contains a MANDATORY REQUIREMENT violation: the month-over-month growth rate calculation is fundamentally incorrect. The specification requires 'percentage change from previous month' which should compare monthly aggregates, not daily values with a flawed LAG logic. The current implementation will produce incorrect results for the mom_growth_pct column, which is one of the four required output columns. This violates the mandatory requirement that 'All four output columns are populated with correct calculations.' Additionally, the WHERE and ORDER BY clauses are correct, and security/performance are generally acceptable, but the core calculation error is disqualifying.</td>
+            </tr>
+        
+            <tr>
+                <td>Testing with performance-critical requirement: extracting details for large datasets while optimizing for query performance with indexing considerations</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract order details from a large e-commerce database containing 50M+ transactions. Source tables: Orders (order_id, customer_id, order_date, total_amount) and OrderItems (item_id, order_id, product_id, quantity, unit_price). Extraction condition: All orders placed in the last 12 months with total_amount > $100, including itemized details. Performance requirement: Query must complete within 5 seconds on production environment.<br><strong>Table Schema:</strong> CREATE TABLE Orders (order_id BIGINT PRIMARY KEY, customer_id INT NOT NULL, order_date TIMESTAMP NOT NULL, total_amount DECIMAL(10,2), INDEX idx_order_date (order_date), INDEX idx_customer_id (customer_id)); CREATE TABLE OrderItems (item_id BIGINT PRIMARY KEY, order_id BIGINT NOT NULL, product_id INT NOT NULL, quantity INT, unit_price DECIMAL(10,2), FOREIGN KEY (order_id) REFERENCES Orders(order_id), INDEX idx_order_id (order_id));<br><strong>Mapping:</strong> Orders.order_id → Detail_Order_ID (BIGINT, required, PK); Orders.customer_id → Customer_ID (INT, required); Orders.order_date → Order_Date (TIMESTAMP, required, filter on last 12 months); Orders.total_amount → Total_Amount (DECIMAL(10,2), required, filter > 100); OrderItems.item_id → Line_Item_ID (BIGINT, required); OrderItems.product_id → Product_ID (INT, required); OrderItems.quantity → Item_Quantity (INT, required); OrderItems.unit_price → Item_Unit_Price (DECIMAL(10,2), required). Transfer rule: Join on order_id, aggregate item details per order.</td>
+                <td class="criteria">• SQL query correctly filters orders by date range (last 12 months) and amount threshold (>$100)<br>• Query includes proper JOIN between Orders and OrderItems with indexed columns to optimize performance<br>• Result set includes all mapped logical columns with correct data types and maintains referential integrity<br>• Query demonstrates index utilization strategy suitable for large dataset (50M+ rows) to meet 5-second execution requirement</td>
+                <td class="output"><pre>```sql
+SELECT 
+    o.order_id AS Detail_Order_ID,
+    o.customer_id AS Customer_ID,
+    o.order_date AS Order_Date,
+    o.total_amount AS Total_Amount,
+    oi.item_id AS Line_Item_ID,
+    oi.product_id AS Product_ID,
+    oi.quantity AS Item_Quantity,
+    oi.unit_price AS Item_Unit_Price
+FROM Orders o
+INNER JOIN OrderItems oi 
+    ON o.order_id = oi.order_id
+WHERE o.order_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+  AND o.total_amount > 100
+ORDER BY o.order_id, oi.item_id;
+```
+
+---
+
+## Query Design Rationale
+
+### **1. Column Selection Compliance**
+- **All mapped columns explicitly selected:**
+  - From `Orders`: `order_id`, `customer_id`, `order_date`, `total_amount`
+  - From `OrderItems`: `item_id`, `product_id`, `quantity`, `unit_price`
+- **No omitted fields** — every mapping requirement included with proper aliases matching the output schema
+
+### **2. Join Strategy**
+- **INNER JOIN** on `order_id` ensures only orders with items are returned
+- Leverages existing `FOREIGN KEY` relationship and `idx_order_id` index on `OrderItems` for optimal execution
+
+### **3. Filtering Logic**
+- **`order_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`** — filters last 12 months (calendar-aware, handles year boundaries)
+- **`total_amount > 100`** — hard filter on order total
+- Both filters apply at the `Orders` table level, reducing join cardinality before ItemIDs are processed
+- Uses indexed column `order_date` (via `idx_order_date`) to maximize filter pushdown efficiency
+
+### **4. Aggregation & Grouping**
+- **No GROUP BY clause required** — mapping specifies "aggregate item details per order," achieved via INNER JOIN (1:N relationship preserves all line items per order)
+- Each row represents one order-item combination (detail-level grain)
+- No aggregate functions needed; native join cardinality handles the itemization
+
+### **5. Ordering**
+- **ORDER BY** uses only selected columns (`order_id`, `item_id`)
+- Ensures deterministic output and compatibility with strict SQL modes (`ONLY_FULL_GROUP_BY` in MySQL 5.7+)
+- Logical ordering by order, then by item within order for readability
+
+### **6. Performance Optimization**
+- **Index utilization:**
+  - `idx_order_date` on `Orders` — accelerates 12-month range predicate
+  - `idx_order_id` on `OrderItems` — optimizes join lookup
+  - `PRIMARY KEY` on both tables ensures rapid row access
+- **Predicate pushdown:** Filters applied before join, reducing intermediate result set
+- **Early filtering on large table:** 50M+ Orders filtered to ~12-month subset before joining with OrderItems
+- **Estimated execution < 5 seconds** on production hardware with standard indexing strategy
+
+---
+
+## Compatibility Notes
+- **MySQL/MariaDB:** Use `DATE_SUB(CURDATE(), INTERVAL 12 MONTH)` or `DATE_ADD(NOW(), INTERVAL -12 MONTH)`
+- **PostgreSQL:** Replace with `CURRENT_DATE - INTERVAL '12 months'`
+- **SQL Server:** Replace with `DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))`</pre></td>
+                <td class="score-col"><span class="score score-high">8</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: (1) All 8 mapped columns are selected with correct data types and aliases; (2) WHERE clause correctly filters by date range and amount threshold; (3) INNER JOIN on order_id is correct and leverages indexed columns; (4) ORDER BY uses selected columns only. The query demonstrates solid index utilization strategy appropriate for the 50M+ row dataset. However, there are secondary concerns: the date calculation method could be more precise for 'last 12 months' semantics, the ORDER BY on a non-indexed column (item_id) may impact performance, and the lack of pagination strategy for potentially massive result sets could violate the 5-second SLA under worst-case scenarios. These are not mandatory violations but represent optimization gaps for production deployment.</td>
+            </tr>
+        
+            <tr>
+                <td>Testing with legacy database schema: handling denormalized structures, special naming conventions, and outdated column types</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract customer order details from a legacy e-commerce database. Source tables: CUST_MST (customer master, denormalized with embedded address fields), ORD_HDR (order header with non-standard date format YYYYMMDD), ORD_DTL (order detail with VARCHAR product codes). Filter for orders placed in 2023 with status 'COMPLETED' or 'SHIPPED'. Output should include customer ID, order number, order date, product details, and total amount.<br><strong>Table Schema:</strong> CREATE TABLE CUST_MST (CUST_ID CHAR(8), CUST_NM VARCHAR(100), CUST_ADDR_LN1 VARCHAR(100), CUST_ADDR_LN2 VARCHAR(100), CUST_CITY VARCHAR(50), CUST_ST CHAR(2), CUST_ZIP CHAR(5), CUST_PH VARCHAR(15)); CREATE TABLE ORD_HDR (ORD_NO CHAR(10), CUST_ID CHAR(8), ORD_DT CHAR(8), ORD_STAT VARCHAR(20), ORD_TOT_AMT NUMERIC(10,2)); CREATE TABLE ORD_DTL (ORD_NO CHAR(10), ORD_LN_NO SMALLINT, PRD_CD VARCHAR(20), PRD_QTY NUMERIC(7,2), PRD_PRC NUMERIC(10,2)); Primary Keys: CUST_MST(CUST_ID), ORD_HDR(ORD_NO), ORD_DTL(ORD_NO, ORD_LN_NO). Foreign Key: ORD_HDR.CUST_ID references CUST_MST.CUST_ID.<br><strong>Mapping:</strong> CUST_ID (physical: CUST_MST.CUST_ID, logical: Customer Identifier, type: CHAR, length: 8, rule: trim leading zeros for display). ORD_NO (physical: ORD_HDR.ORD_NO, logical: Order Number, type: CHAR, length: 10, rule: no transformation). ORD_DT (physical: ORD_HDR.ORD_DT, logical: Order Date, type: CHAR, length: 8 YYYYMMDD format, rule: convert to standard DATE format YYYY-MM-DD). ORD_STAT (physical: ORD_HDR.ORD_STAT, logical: Order Status, type: VARCHAR, rule: filter only 'COMPLETED' and 'SHIPPED'). PRD_CD (physical: ORD_DTL.PRD_CD, logical: Product Code, type: VARCHAR, length: 20, rule: uppercase, trim whitespace). PRD_QTY and PRD_PRC (physical: ORD_DTL.PRD_QTY, ORD_DTL.PRD_PRC, logical: Quantity and Price, type: NUMERIC, rule: calculate line total as PRD_QTY * PRD_PRC). ORD_TOT_AMT (physical: ORD_HDR.ORD_TOT_AMT, logical: Order Total Amount, type: NUMERIC, length: 10,2, rule: no transformation).</td>
+                <td class="criteria">• SQL correctly joins all three tables using proper foreign key relationships and handles denormalized address fields appropriately<br>• Date conversion from CHAR(8) YYYYMMDD format to standard DATE format is implemented correctly<br>• Filter logic correctly applies status conditions ('COMPLETED' OR 'SHIPPED') and year 2023 constraint<br>• Column transformations (trim CUST_ID, uppercase PRD_CD, calculate line totals) are applied as specified in mapping rules</td>
+                <td class="output"><pre>```sql
+SELECT
+    LTRIM(RTRIM(C.CUST_ID), '0') AS CUST_ID,
+    O.ORD_NO,
+    TO_DATE(O.ORD_DT, 'YYYYMMDD') AS ORD_DT,
+    O.ORD_STAT,
+    UPPER(LTRIM(RTRIM(D.PRD_CD))) AS PRD_CD,
+    D.PRD_QTY,
+    D.PRD_PRC,
+    (D.PRD_QTY * D.PRD_PRC) AS PRD_LN_TOT,
+    O.ORD_TOT_AMT
+FROM
+    CUST_MST C
+    INNER JOIN ORD_HDR O
+        ON C.CUST_ID = O.CUST_ID
+    INNER JOIN ORD_DTL D
+        ON O.ORD_NO = D.ORD_NO
+WHERE
+    YEAR(TO_DATE(O.ORD_DT, 'YYYYMMDD')) = 2023
+    AND O.ORD_STAT IN ('COMPLETED', 'SHIPPED')
+ORDER BY
     CUST_ID,
-    CUST_NAME,
-    CUST_EMAIL,
-    CUST_PHONE
-FROM CUSTOMERS
-WHERE CUST_ID IS NOT NULL
-ORDER BY CUST_ID;
+    ORD_NO,
+    ORD_DT,
+    D.ORD_LN_NO;
 ```
 
-### 4.3 Extraction Parameters
+---
 
-- **</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution demonstrates good structural organization and covers several secondary criteria well (architecture, mapping expansion, extraction details). However, it fails multiple MANDATORY requirements: (1) No Python transformation code is provided despite explicit requirement that 'The transform will be processed by the Python Code'; (2) No document history section exists; (3) SQL Detail sheet is incomplete and not properly structured as a referenceable section; (4) The solution is incomplete (cuts off mid-sentence in extraction parameters). These are not minor omissions but explicit mandatory requirements stated in the task. The solution reads as a partial draft rather than a complete detailed design document.</td>
+### **Query Design Rationale**
+
+| Requirement | Implementation |
+|---|---|
+| **Customer ID Transformation** | `LTRIM(RTRIM(C.CUST_ID), '0')` – Trims leading zeros per mapping rule |
+| **Date Format Conversion** | `TO_DATE(O.ORD_DT, 'YYYYMMDD')` – Converts CHAR(8) YYYYMMDD to standard DATE YYYY-MM-DD format |
+| **Order Status Filter** | `WHERE O.ORD_STAT IN ('COMPLETED', 'SHIPPED')` – Restricts to specified statuses only |
+| **Year 2023 Filter** | `YEAR(TO_DATE(O.ORD_DT, 'YYYYMMDD')) = 2023` – Extracts year from date field |
+| **Product Code Normalization** | `UPPER(LTRIM(RTRIM(D.PRD_CD)))` – Standardizes to uppercase with trimmed whitespace |
+| **Line Item Total** | `(D.PRD_QTY * D.PRD_PRC) AS PRD_LN_TOT` – Calculates product quantity × price |
+| **Complete Column Selection** | All mapped attributes explicitly selected (CUST_ID, ORD_NO, ORD_DT, ORD_STAT, PRD_CD, PRD_QTY, PRD_PRC, line total, ORD_TOT_AMT) |
+| **No Aggregation** | Query returns detail-level rows (no GROUP BY) – each order line item appears as a separate row |
+| **Strict ORDER BY** | References only columns in SELECT clause; uses `D.ORD_LN_NO` for line-level ordering within orders |
+
+---
+
+### **Notes**
+- **Database Compatibility:** If using MySQL, replace `TO_DATE(O.ORD_DT, 'YYYYMMDD')` with `STR_TO_DATE(O.ORD_DT, '%Y%m%d')` and `YEAR()` function remains the same.
+- **SQL Server:** Use `CONVERT(DATE, O.ORD_DT, 112)` for date conversion.
+- **PostgreSQL:** Use `TO_DATE(O.ORD_DT, 'YYYYMMDD')` as specified.
+- The query maintains referential integrity through INNER JOINs, returning only orders with valid customers and order details.</pre></td>
+                <td class="score-col"><span class="score score-low">3</span></td>
+                <td class="reasoning">The solution demonstrates strong understanding of the requirements and correctly addresses most criteria: proper joins, correct filters, appropriate transformations, and complete column selection. However, it contains a CRITICAL syntax error in the CUST_ID transformation that will cause query failure in most SQL databases. The LTRIM(RTRIM(...), '0') syntax is invalid - LTRIM and RTRIM do not accept a second trim character argument in standard SQL. Additionally, there are minor performance and portability issues with the date extraction logic and ORDER BY clause. These defects prevent the solution from being executable as written.</td>
             </tr>
         
             <tr>
-                <td>Testing with an ETL design including data masking and encryption requirements for PII (personally identifiable information)</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> Base Design Document - Customer Data Migration Project
+                <td>Testing with composite/hierarchical data structure: extracting details from parent-child relationships or tree-like organizational hierarchies</td>
+                <td class="prompt-inputs"><strong>Overview:</strong> Extract detailed employee information organized by department hierarchy. Source tables: Departments (parent level) and Employees (child level). Extraction condition: All active employees with their department chain (from root department to direct department), including department budget allocation percentages at each level.<br><strong>Table Schema:</strong> CREATE TABLE Departments (
+  dept_id INT PRIMARY KEY,
+  dept_name VARCHAR(100) NOT NULL,
+  parent_dept_id INT,
+  budget_amount DECIMAL(12,2),
+  level INT,
+  FOREIGN KEY (parent_dept_id) REFERENCES Departments(dept_id)
+);
 
-History Updated: v2.1 - Added PII masking requirements
-Overview: Migrate customer records from legacy Oracle DB to cloud PostgreSQL with encryption and masking of sensitive fields (SSN, email, phone, credit card)
-Sender Spec: Oracle 11g database, 2.5M customer records, unencrypted PII fields
-Receiver Spec: AWS RDS PostgreSQL, encrypted at-rest, masked PII in non-production environments
-Mapping: Source columns to target columns with transformation rules<br><strong>type:</strong> DB to DB<br><strong>mapping_sheet:</strong> | Physical Column | Logical Column | Data Type | Length | Rule Transfer | Required |
-|---|---|---|---|---|---|
-| CUST_ID | CustomerID | INT | 10 | Direct copy, primary key | Yes |
-| CUST_SSN | SSN | VARCHAR | 11 | Encrypt with AES-256, mask last 5 digits in non-prod | Yes |
-| CUST_EMAIL | Email | VARCHAR | 100 | Encrypt with AES-256, hash for matching | Yes |
-| CUST_PHONE | PhoneNumber | VARCHAR | 15 | Encrypt with AES-256, mask first 6 digits | Yes |
-| CUST_CC | CreditCard | VARCHAR | 16 | Encrypt with AES-256, tokenize, never log | Yes |
-| CUST_NAME | FullName | VARCHAR | 100 | Direct copy | No |
-| CUST_ADDR | Address | VARCHAR | 255 | Direct copy | No |<br><strong>overview_sheet:</strong> WORKFLOW CHART:
-
-[Oracle Source] → [Extract] → [Validate PII] → [Encrypt/Mask] → [Load] → [PostgreSQL Target]
-
-WORKFLOW DESCRIPTIONS:
-1. Extract: Read customer records from Oracle, identify PII columns
-2. Validate PII: Verify data format (SSN pattern, email format, phone digits) before transformation
-3. Encrypt/Mask: Apply AES-256 encryption to sensitive fields; mask PII in non-production copies; tokenize credit cards
-4. Load: Insert encrypted/masked data into PostgreSQL with audit logging of all transformations
-5. Verify: Validate row counts, checksum encrypted values, confirm PII is not in logs</td>
-                <td class="criteria">• Detail Design specifies encryption algorithm (AES-256) and masking strategy for all PII columns (SSN, email, phone, credit card)<br>• Mapping sheet includes transformation rules with clear masking patterns and encryption requirements for each sensitive field<br>• Design addresses both production (encrypted only) and non-production (encrypted + masked) data handling requirements<br>• Workflow includes validation and audit steps to ensure PII protection throughout the ETL pipeline</td>
-                <td class="output"><pre># DETAILED DESIGN DOCUMENT
-## Customer Data Migration Project (Oracle to AWS RDS PostgreSQL)
-
----
-
-## 1. EXECUTIVE SUMMARY
-
-This document provides comprehensive technical specifications for migrating 2.5M customer records from Oracle 11g to AWS RDS PostgreSQL with enterprise-grade security controls including AES-256 encryption, PII masking, and tokenization.
-
-**Project Scope:**
-- Source: Oracle 11g (unencrypted PII)
-- Target: AWS RDS PostgreSQL (encrypted at-rest)
-- Volume: 2.5M records
-- Timeline: [To be defined]
-- Risk Level: HIGH (PII handling)
-
----
-
-## 2. ARCHITECTURE & SYSTEM DESIGN
-
-### 2.1 High-Level Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     ORACLE SOURCE ENVIRONMENT                   │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Oracle 11g Database - Unencrypted Customer Records (2.5M)  │ │
-│  │  - CUST_ID, CUST_SSN, CUST_EMAIL, CUST_PHONE,             │ │
-│  │    CUST_CC, CUST_NAME, CUST_ADDR                          │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                    JDBC Connection
-                   (VPN/Secure Link)
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  ETL PROCESSING LAYER (EC2)                     │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │              Migration Service Container                   │ │
-│  │  ┌──────────────┬──────────────┬──────────────────────┐   │ │
-│  │  │   Extract    │   Validate   │  Encrypt/Transform   │   │ │
-│  │  │   Module     │   Module     │  Module              │   │ │
-│  │  └──────────────┴──────────────┴──────────────────────┘   │ │
-│  │                                                            │ │
-│  │  Key Management: AWS KMS (Master Keys)                   │ │
-│  │  Encryption: AES-256 (Data Encryption Key)               │ │
-│  │  Masking Engine: RegEx + Custom Rules                    │ │
-│  │  Tokenization: Credit Card Vault (AWS Secrets Manager)   │ │
-│  │  Audit Logging: CloudWatch + RDS Enhanced Monitoring     │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                  JDBC Connection
-                   (AWS VPC Private)
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              AWS RDS POSTGRESQL TARGET ENVIRONMENT              │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  PostgreSQL 14+ (Encrypted at-rest, VPC isolated)         │ │
-│  │  - Encrypted CustomerID, SSN, Email, Phone, CreditCard   │ │
-│  │  - Masked PII (Non-Prod: xxx-xx-1234, ****@****.com)     │ │
-│  │  - Audit Trail Table (All transformations logged)         │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution violates multiple MANDATORY requirements. The extra_important_criteria explicitly requires: (1) document history, (2) flowchart and descriptions from Overview sheet, (3) Python code for data transformation, and (4) SQL Detail sheet with extraction statements. The provided solution only includes a partial architecture diagram and executive summary but completely omits the Python transformation code, SQL extraction statements, document history, and detailed workflow descriptions. While the solution demonstrates understanding of security concepts, it fails to deliver the core technical artifacts needed for implementation. This is a structural failure to meet mandatory deliverables.</td>
-            </tr>
-        
-            <tr>
-                <td>Testing with a high-volume ETL design (millions of records) requiring performance optimization, partitioning, and parallel processing strategies</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> History Updated: Last modified 2024-01-15 | Overview: Daily ETL pipeline processing 5M customer records from Oracle DB to Snowflake DW | Sender Spec: Oracle OLTP (transactional tables: CUSTOMERS, ORDERS, TRANSACTIONS) | Receiver Spec: Snowflake staging and fact tables | Mapping Sheet: CUSTOMERS (ID, NAME, EMAIL, PHONE, ADDRESS, CREATED_DATE, UPDATED_DATE) → DIM_CUSTOMER; ORDERS (ORDER_ID, CUSTOMER_ID, ORDER_DATE, AMOUNT, STATUS) → FACT_ORDERS; TRANSACTIONS (TXN_ID, ORDER_ID, AMOUNT, TXN_TYPE, TIMESTAMP) → FACT_TRANSACTIONS<br><strong>type:</strong> DB to DB<br><strong>mapping_sheet:</strong> | Physical Column | Logical Column | Data Type | Length | Rule Transfer | Required | CUSTOMERS.ID → DIM_CUSTOMER.CUSTOMER_KEY | VARCHAR | 50 | PK, Hash distribution | Y | CUSTOMERS.UPDATED_DATE → DIM_CUSTOMER.LOAD_DATE | TIMESTAMP | - | Filter incremental loads (>= last_run_time) | Y | ORDERS.ORDER_DATE → FACT_ORDERS.ORDER_DATE | DATE | - | Partition by month, cluster by CUSTOMER_ID | Y | TRANSACTIONS.AMOUNT → FACT_TRANSACTIONS.TRANSACTION_AMOUNT | DECIMAL | 18,2 | Validate range (0-999999), null handling | Y |<br><strong>overview_sheet:</strong> Workflow: [Source Oracle DB] → [Extract (parallel read 5 threads, batch 100K rows)] → [Transform (data validation, deduplication, aggregation)] → [Load (Snowflake bulk insert with dynamic partitioning)] → [Target Snowflake DW] | Description: Extract phase uses parallel processing across 5 partitions (by CUSTOMER_ID range) to handle 5M records efficiently; Transform applies business rules and incremental logic; Load leverages Snowflake's native partitioning on UPDATED_DATE and clustering on CUSTOMER_ID for query optimization and cost reduction.</td>
-                <td class="criteria">• Detail Design specifies parallel processing strategy (thread count, batch size, partition keys) for high-volume data handling<br>• Includes partitioning and clustering strategy aligned with query patterns and Snowflake performance optimization<br>• Documents incremental load logic and filtering criteria to minimize data transfer and processing overhead<br>• Provides performance considerations (SLA targets, resource allocation, scalability approach) for 5M+ record volumes</td>
-                <td class="output"><pre># Detailed Design: Oracle to Snowflake Daily ETL Pipeline
-
-## 1. EXECUTIVE SUMMARY
-
-| Attribute | Details |
-|-----------|---------|
-| **Pipeline Name** | Oracle OLTP → Snowflake DW Daily ETL |
-| **Last Updated** | 2024-01-15 |
-| **Type** | Database-to-Database (DB2DB) |
-| **Volume** | 5M customer records daily |
-| **Frequency** | Daily (incremental + full reconciliation) |
-| **SLA** | 4-hour completion window |
-| **Criticality** | HIGH (Revenue-impacting data) |
-
----
-
-## 2. ARCHITECTURE OVERVIEW
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     EXTRACTION LAYER                             │
-├─────────────────────────────────────────────────────────────────┤
-│  Oracle OLTP Database                                            │
-│  ├── CUSTOMERS (2M rows)                                         │
-│  ├── ORDERS (3M rows)                                            │
-│  └── TRANSACTIONS (5M rows)                                      │
-│                     │                                            │
-│          [Parallel Reader - 5 Threads]                           │
-│          Partition Strategy: CUSTOMER_ID Range                   │
-│          Batch Size: 100K rows/thread                            │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    TRANSFORMATION LAYER                          │
-├─────────────────────────────────────────────────────────────────┤
-│  1. Incremental Filter (>= last_run_time)                        │
-│  2. Data Validation & Cleansing                                  │
-│  3. Deduplication Logic                                          │
-│  4. Business Rule Application                                    │
-│  5. Aggregation & Enrichment                                     │
-│  6. Quality Checks (Row count, checksum)                         │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                      LOAD LAYER                                  │
-├─────────────────────────────────────────────────────────────────┤
-│  Snowflake Staging Zone (Temporary)                              │
-│  ├── STG_CUSTOMERS                                               │
-│  ├── STG_ORDERS                                                  │
-│  └── STG_TRANSACTIONS                                            │
-│                     │                                            │
-│          [Dynamic Partitioning & Clustering]                     │
-│          Partition: UPDATED_DATE (Monthly)                       │
-│          Cluster Key: CUSTOMER_ID                                │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                 WAREHOUSE LAYER (SNOWFLAKE DW)                   │
-├─────────────────────────────────────────────────────────────────┤
-│  Dimension Tables:                                               │
-│  ├── DIM_CUSTOMER (SCD Type 2)                                   │
-│  │                                                               │
-│  Fact Tables:                                                    │
-│  ├── FACT_ORDERS (Partitioned by month)                          │
-│  ├── FACT_TRANSACTIONS (Partitioned by month)                    │
-│  └── FACT_ORDER_SUMMARY (Aggregated layer)                       │
-│                                                                  │
-│  Audit Tables:                                                   │
-│  ├── AUDIT_LOAD_LOG                                              │
-│  └── AUDIT_DATA_QUALITY                                          │
-└─────────────────────────────────────────────────────────────────┘
-```</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution demonstrates strong architectural understanding and meets some secondary criteria (parallel processing strategy, partitioning/clustering design, SLA documentation). However, it catastrophically fails all three MANDATORY requirements: (1) No Python transformation code provided despite explicit requirement that transforms be 'processed by the Python Code', (2) No SQL Detail sheet with extraction SQL statements, and (3) No document history section. The solution reads as an incomplete architectural overview rather than a complete detailed design document with implementation artifacts. These are not minor omissions—they are explicitly mandated components that must be present.</td>
-            </tr>
-        
-            <tr>
-                <td>Testing with a legacy system migration ETL design involving data type conversions and format standardization</td>
-                <td class="prompt-inputs"><strong>sheet:</strong> Legacy HR System Migration | History Updated: 2024-01-15 | Overview: Migrate employee records from legacy COBOL-based system to modern PostgreSQL database | Sender Spec: Fixed-width text files (EBCDIC encoding, 80-char records) | Receiver Spec: Normalized PostgreSQL tables with UTF-8 encoding | Mapping: Employee ID, Name, Hire Date, Salary, Department Code<br><strong>type:</strong> File to DB<br><strong>mapping_sheet:</strong> | Physical Column | Logical Column | Source Type | Source Length | Target Type | Target Length | Conversion Rule | Required | Notes |
-|---|---|---|---|---|---|---|---|---|
-| EMP_ID_CHAR | employee_id | CHAR | 6 | INTEGER | - | Trim and convert to numeric | YES | Left-padded with zeros |
-| EMP_NAME_CHAR | full_name | CHAR | 30 | VARCHAR | 100 | EBCDIC to UTF-8, trim trailing spaces | YES | Mixed case standardization |
-| HIRE_DATE_NUM | hire_date | NUMERIC | 8 | DATE | - | YYYYMMDD format conversion to ISO 8601 | YES | Validate date range 1980-2024 |
-| SALARY_COMP | annual_salary | NUMERIC | 9 (2 decimals) | DECIMAL | 10,2 | Direct numeric conversion, validate > 0 | YES | Handle negative indicators (CR/DB) |
-| DEPT_CODE_CHAR | department_id | CHAR | 3 | VARCHAR | 10 | Lookup table mapping, uppercase | YES | Validate against department master |<br><strong>overview_sheet:</strong> WORKFLOW CHART:
-[Legacy EBCDIC Files] → [Data Validation Layer] → [Character Encoding Conversion] → [Data Type Transformation] → [Business Rule Application] → [PostgreSQL Database]
-
-WORKFLOW DESCRIPTIONS:
-1. Data Validation Layer: Read fixed-width records, validate record structure and field lengths, reject malformed records to error log
-2. Character Encoding Conversion: Convert EBCDIC encoded text to UTF-8, handle special characters and numeric indicators
-3. Data Type Transformation: Convert CHAR to INTEGER/VARCHAR/DATE/DECIMAL with appropriate precision and scale
-4. Business Rule Application: Apply lookup tables for department codes, validate salary ranges, standardize date formats
-5. Load to PostgreSQL: Insert validated records into normalized tables, log transformation statistics and any rejected records</td>
-                <td class="criteria">• Provides detailed technical specifications for all data type conversions (EBCDIC→UTF-8, CHAR→INTEGER/DATE/DECIMAL)<br>• Includes transformation rules for each field with validation logic and error handling strategy<br>• Maps physical legacy columns to logical target schema with complete metadata (length, type, required status)<br>• Describes complete workflow with clear sequence from source extraction through database load</td>
-                <td class="output"><pre># DETAILED DESIGN: Legacy HR System Migration
-
-## 1. SYSTEM ARCHITECTURE
-
-### 1.1 Component Overview
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    MIGRATION PIPELINE                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  [Source]  →  [Extract]  →  [Transform]  →  [Validate]  →     │
-│  EBCDIC       Fixed-Width     Multi-Stage     Business Rules    │
-│  Files        Parser           Processing      Checks           │
-│                                                 ↓               │
-│                                          [Load]  →  [Target]   │
-│                                          PostgreSQL  Database    │
-│                                                 ↓               │
-│                                          [Logging]              │
-│                                          Statistics &           │
-│                                          Error Reports          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 1.2 Technology Stack
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Extraction** | Python 3.9+ with `struct` module | Parse fixed-width EBCDIC files |
-| **Encoding** | `ebcdic2utf8` library / `codecs` | EBCDIC → UTF-8 conversion |
-| **Validation** | Custom validators + Pandera | Schema & business rule validation |
-| **Database** | PostgreSQL 12+ | Target data warehouse |
-| **Logging** | Python `logging` + ELK Stack | Centralized error tracking |
-| **Orchestration** | Apache Airflow / Python scripts | Workflow scheduling |
-| **Error Handling** | Dead Letter Queue (DLQ) | Rejected record persistence |
-
----
-
-## 2. DETAILED DATA FLOW
-
-### 2.1 Stage 1: Data Extraction Layer
-
-#### Purpose
-Extract and parse fixed-width EBCDIC records from legacy source files
-
-#### Specifications
-```
-INPUT FORMAT:
-├── Record Length: 80 characters (fixed)
-├── Character Encoding: EBCDIC (Code Page 37)
-├── Line Terminator: CRLF or LF
-├── File Format: Flat text files
-└── Typical File Size: 10MB - 2GB per batch
-
-RECORD STRUCTURE:
-┌──────────┬──────────┬──────────────────┬──────────────┬─────────┐
-│ EMP_ID   │ EMP_NAME │ HIRE_DATE_NUM    │ SALARY_COMP  │ DEPT    │
-│ (6 chars)│(30 chars)│ (8 numeric)      │ (9 numeric)  │ (3 ch)  │
-│ Pos 1-6  │ Pos 7-36 │ Pos 37-44        │ Pos 45-53    │ 54-56   │
-│ Padding: │ Padding: │ Format: YYYYMMDD │ Format:      │ Padding:│
-│ 0-left   │ space-rt │ No separators    │ 999999999.99 │ space   │
-└──────────┴──────────┴──────────────────┴──────────────┴─────────┘
-```
-
-#### Extraction Code Structure
-```python
-import struct
-import codecs
-from typing import List, Tuple, Dict
-
-class EBCDICFileExtractor:
-    """Parse EBCDIC fixed-width legacy files"""
+CREATE TABLE Employees (
+  emp_id INT PRIMARY KEY,
+  emp_name VARCHAR(100) NOT NULL,
+  dept_id INT NOT NULL,
+  salary DECIMAL(10,2),
+  status VARCHAR(20),
+  FOREIGN KEY (dept_id) REFERENCES Departments(dept_id)
+);<br><strong>Mapping:</strong> Departments table: dept_id (Physical: INT, Logical: Department Identifier, Required: Yes), dept_name (Physical: VARCHAR(100), Logical: Department Name, Required: Yes), parent_dept_id (Physical: INT, Logical: Parent Department Reference for hierarchy, Required: No), budget_amount (Physical: DECIMAL(12,2), Logical: Department Budget, Rule: Sum child budgets if parent, Required: Yes), level (Physical: INT, Logical: Hierarchy Level, Rule: Auto-calculated from parent chain, Required: Yes). Employees table: emp_id (Physical: INT, Logical: Employee ID, Required: Yes), emp_name (Physical: VARCHAR(100), Logical: Employee Name, Required: Yes), dept_id (Physical: INT, Logical: Assigned Department, Required: Yes), salary (Physical: DECIMAL(10,2), Logical: Employee Salary, Required: Yes), status (Physical: VARCHAR(20), Logical: Employment Status, Rule: Filter where status='ACTIVE', Required: Yes).</td>
+                <td class="criteria">• SQL correctly joins Departments and Employees tables with proper parent-child relationship handling<br>• Result includes complete hierarchical department path for each employee from root to leaf department<br>• Output filtered to include only active employees with all required columns (emp_id, emp_name, full_dept_hierarchy, salary, budget_allocation)<br>• Hierarchical structure is correctly represented with department levels and parent-child chain intact</td>
+                <td class="output"><pre>```sql
+-- Detail Design: Employee Information with Department Hierarchy and Budget Allocation
+SELECT 
+    -- Department Hierarchy Chain
+    d.dept_id,
+    d.dept_name,
+    d.parent_dept_id,
+    d.level,
+    d.budget_amount,
     
-    # Fixed-width field definitions
-    FIELD_SPECS = {
-        'emp_id': (0, 6),          # bytes 0-5
-        'emp_name': (6, 36),       # bytes 6-35
-        'hire_date': (36, 44),     # bytes 36-43
-        'salary': (44, 53),        # bytes 44-52
-        'dept_code': (53, 56),     # bytes 53-55
-        'filler': (</pre></td>
+    -- Department Budget Allocation Percentage (calculated at current level)
+    ROUND(
+        (d.budget_amount / 
+            NULLIF(
+                (SELECT SUM(budget_amount) 
+                 FROM Departments d2 
+                 WHERE d2.parent_dept_id = d.parent_dept_id),
+                0
+            )
+        ) * 100, 
+        2
+    ) AS budget_allocation_percentage,
+    
+    -- Employee Information
+    e.emp_id,
+    e.emp_name,
+    e.salary,
+    e.status,
+    
+    -- Department Chain Path (concatenated hierarchy from root to direct department)
+    STRING_AGG(d_chain.dept_name, ' > ') WITHIN GROUP (ORDER BY d_chain.level ASC) AS department_chain
+    
+FROM Employees e
+INNER JOIN Departments d ON e.dept_id = d.dept_id
+LEFT JOIN Departments d_chain ON d_chain.dept_id = e.dept_id 
+    OR d_chain.dept_id IN (
+        -- Recursive query to get all parent departments in the chain
+        WITH RECURSIVE dept_hierarchy AS (
+            SELECT dept_id, parent_dept_id, dept_name, level
+            FROM Departments
+            WHERE dept_id = e.dept_id
+            
+            UNION ALL
+            
+            SELECT d.dept_id, d.parent_dept_id, d.dept_name, d.level
+            FROM Departments d
+            INNER JOIN dept_hierarchy dh ON d.dept_id = dh.parent_dept_id
+        )
+        SELECT dept_id FROM dept_hierarchy
+    )
+
+WHERE e.status = 'ACTIVE'
+
+GROUP BY 
+    d.dept_id,
+    d.dept_name,
+    d.parent_dept_id,
+    d.level,
+    d.budget_amount,
+    e.emp_id,
+    e.emp_name,
+    e.salary,
+    e.status
+
+ORDER BY 
+    d.level ASC,
+    d.dept_id ASC,
+    e.emp_id ASC;
+```
+
+**Alternative Simplified Version** (if STRING_AGG is not available or for better performance):
+
+```sql
+-- Detail Design: Employee Information with Department Hierarchy and Budget Allocation
+WITH RECURSIVE dept_chain AS (
+    -- Base case: leaf departments (most specific)
+    SELECT 
+        dept_id,
+        dept_name,
+        parent_dept_id,
+        level,
+        budget_amount,
+        CAST(dept_name AS VARCHAR(1000)) AS full_chain,
+        1 AS chain_level
+    FROM Departments
+    
+    UNION ALL
+    
+    -- Recursive case: traverse up the hierarchy
+    SELECT 
+        dc.dept_id,
+        dc.dept_name,
+        d.parent_dept_id,
+        d.level,
+        dc.budget_amount,
+        CAST(d.dept_name + ' > ' + dc.full_chain AS VARCHAR(1000)),
+        dc.chain_level + 1
+    FROM dept_chain dc
+    INNER JOIN Departments d ON dc.parent_dept_id = d.dept_id
+)
+
+SELECT 
+    -- Department Hierarchy Chain
+    d.dept_id,
+    d.dept_name,
+    d.parent_dept_id,
+    d.level,
+    d.budget_amount,
+    
+    -- Department Budget Allocation Percentage
+    ROUND(
+        (d.budget_amount / 
+            NULLIF(
+                (SELECT SUM(budget_amount) 
+                 FROM Departments d2 
+                 WHERE d2.parent_dept_id = d.parent_dept_id),
+                0
+            )
+        ) * 100, 
+        2
+    ) AS budget_allocation_percentage,
+    
+    -- Employee Information
+    e</pre></td>
                 <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution violates multiple MANDATORY requirements from extra_important_criteria: (1) No 'History of document' section present, (2) Incomplete Python transformation code that cannot be executed or referenced, (3) Missing explicit SQL Detail sheet section (even if empty), (4) The mapping_sheet is not integrated into the design document. While the solution demonstrates good architectural thinking and begins addressing technical specifications, it is fundamentally incomplete. The Python code section abruptly terminates without providing the actual transformation logic needed to convert data types, handle EBCDIC encoding, apply business rules, or load to PostgreSQL. This makes the solution non-functional as a detailed design document that could guide implementation. The solution reads as a draft or outline rather than a complete detailed design.</td>
+                <td class="reasoning">The solution violates multiple MANDATORY requirements: (1) The first SQL query is syntactically invalid with improper subquery placement in JOIN condition; (2) The second query is incomplete and non-executable; (3) Required columns from the Mapping are not fully selected (missing complete employee and department information); (4) The WHERE and JOIN clauses, while conceptually attempting correctness, are malformed in the first version and incomplete in the second; (5) The hierarchical path construction doesn't properly deliver the requirement of 'department chain from root department to direct department' for each employee in a reliable, queryable format. The solution demonstrates understanding of the problem but fails in execution and completeness, making it non-functional as written.</td>
             </tr>
         
             </tbody>

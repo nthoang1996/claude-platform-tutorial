@@ -605,18 +605,16 @@ class PromptEvaluator:
 
         return results
     
-# evaluator = PromptEvaluator(max_concurrent_tasks=5)
+evaluator = PromptEvaluator(max_concurrent_tasks=5)
 
 # dataset = evaluator.generate_dataset(
 #     # Describe the purpose or goal of the prompt you're trying to test
-#     task_description="Write a Detail Design for a ETL project based on the markdown Base Design input",
+#     task_description="Write a SQL extract for Detail Design based on the Base Design Requirement",
 #     # Describe the different inputs that your prompt requires
 #     prompt_inputs_spec={
-#         "sheet": "Contain History Updated, Overview, Sender Spec, Receiver Spec, Mapping",
-#         "type": "DB to DB, File to DB, File to File, DB to File",
-#         "mapping_sheet": "Description by the table include physical column, logical column, type, length, rule transfer, required",
-#         "overview_sheet": "Include the workflow chart on the left hand side and the description for each workflow on the right hand side"
-        
+#         "Overview": "The source tables, extraction condition",
+#         "Table Schema": "DDL, constrant, key, ...",
+#         "Mapping": "Description by the table include physical column, logical column, type, length, rule transfer, required",        
 #     },
 #     # Where to write the generated dataset
 #     output_file="dataset_dd.json",
