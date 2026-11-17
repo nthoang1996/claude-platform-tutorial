@@ -117,11 +117,11 @@
                 </div>
                 <div class="stat-box">
                     <div>Average Score</div>
-                    <div class="stat-value">4.7 / 10</div>
+                    <div class="stat-value">8.2 / 10</div>
                 </div>
                 <div class="stat-box">
                     <div>Pass Rate (≥7)</div>
-                    <div class="stat-value">30.0%</div>
+                    <div class="stat-value">90.0%</div>
                 </div>
             </div>
         </div>
@@ -140,663 +140,274 @@
             <tbody>
     
             <tr>
-                <td>Testing with a multi-tenant SaaS application requiring schema isolation and tenant-specific data partitioning</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract customer transaction data for a multi-tenant SaaS platform serving 3 distinct clients (TenantID: 1001, 1002, 1003). Source tables: transactions (all tenant data mixed), customers (client master data). Extraction condition: transactions from last 30 days where amount > $100, filtered by tenant isolation. Each tenant must only access their own data through schema-level partitioning.<br><strong>Table Schema:</strong> CREATE TABLE transactions (transaction_id INT PRIMARY KEY, tenant_id INT NOT NULL, customer_id INT, amount DECIMAL(10,2), transaction_date DATE, status VARCHAR(20), FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id), PARTITION BY RANGE (tenant_id)); CREATE TABLE customers (customer_id INT PRIMARY KEY, tenant_id INT NOT NULL, customer_name VARCHAR(100), email VARCHAR(100), UNIQUE(tenant_id, customer_id), CHECK (tenant_id IN (1001, 1002, 1003)));<br><strong>Mapping:</strong> transactions.transaction_id → Physical: txn_id, Logical: TransactionID, Type: INTEGER, Length: 10, Rule: Unique identifier per tenant; transactions.tenant_id → Physical: org_id, Logical: TenantID, Type: INTEGER, Length: 5, Rule: Required for isolation, immutable; transactions.amount → Physical: txn_amount, Logical: TransactionAmount, Type: DECIMAL, Length: 10,2, Rule: Filter >= 100, required; transactions.transaction_date → Physical: created_at, Logical: TransactionDate, Type: DATE, Length: 8, Rule: Filter last 30 days, required; customers.customer_name → Physical: cust_name, Logical: CustomerName, Type: VARCHAR, Length: 100, Rule: Join on customer_id + tenant_id, required.</td>
-                <td class="criteria">• SQL extract includes WHERE clause filtering by tenant_id and date range (last 30 days) and amount threshold (>$100)<br>• Schema partitioning strategy explicitly isolates data by tenant_id to prevent cross-tenant data leakage<br>• Column mapping correctly translates physical names to logical names with proper data types and join conditions on (customer_id, tenant_id) composite key<br>• Extract ensures all three tenants (1001, 1002, 1003) can execute independently without accessing other tenant data</td>
-                <td class="output"><pre># SQL Extract Query for Multi-Tenant Customer Transactions
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    t.transaction_id,
-    t.tenant_id,
-    t.customer_id,
-    t.amount,
-    t.transaction_date,
-    c.customer_name
-FROM
-    transactions t
-    INNER JOIN customers c ON t.tenant_id = c.tenant_id AND t.customer_id = c.customer_id
-WHERE
-    t.tenant_id IN (1001, 1002, 1003)
-    AND t.transaction_date >= CURRENT_DATE - INTERVAL '30 days'
-    AND t.amount >= 100
-ORDER BY
-    t.tenant_id ASC,
-    t.transaction_date DESC,
-    t.transaction_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly 6 mapped columns selected: `transaction_id`, `tenant_id`, `customer_id`, `amount`, `transaction_date`, `customer_name` (no unmapped columns like `status`, `email`, or audit fields included) | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Join Strategy** | INNER JOIN with dual join condition (`tenant_id` + `customer_id`) enforces both referential integrity AND tenant isolation at the database layer, preventing cross-tenant data leakage | ✓ Data integrity & Security |
-| **Tenant Isolation** | WHERE clause explicitly filters `tenant_id IN (1001, 1002, 1003)` to enforce schema-level partitioning; each tenant query must be scoped to their own `tenant_id` only | ✓ Multi-tenant security requirement |
-| **Filtering Conditions** | `transaction_date >= CURRENT_DATE - INTERVAL '30 days'` AND `amount >= 100` enforced per mapping transfer rules | ✓ Mapping transfer rule |
-| **Grouping** | No GROUP BY clause (detail-level extraction of individual transactions, not aggregated summary) | ✓ Guideline 2 |
-| **ORDER BY** | All referenced columns (`tenant_id`, `transaction_date`, `transaction_id`) exist in SELECT clause and mapping specification; ordering by tenant first ensures logical data isolation in output stream | ✓ Guideline 3 |
-| **Performance Impact** | Query leverages: (1) RANGE partition on `transactions.tenant_id` for partition pruning, (2) composite index on `transactions(tenant_id, customer_id, transaction_date, amount)` for filter optimization, (3) foreign key index on `customers(tenant_id, customer_id)` for join acceleration. Avoids full table scans on unmapped columns. | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | (1) PII field `customer_name` included only as mapped; email intentionally excluded per mapping (least-privilege attribute scope). (2) Tenant isolation enforced at SQL predicate level, not application layer (defense-in-depth). (3) Parameterized tenant filtering prevents tenant-switching injection attacks. (4) `amount >= 100` filter reduces dataset volume, improving secure data transfer efficiency. | ✓ Guideline 4 (Security & Privacy) |
-| **Production Readiness** | Composite indexing strategy with tenant ID as leading column ensures partition-aware query execution; immutable `tenant_id` rule prevents data corruption; dual-key join enforces logical and physical data separation for SaaS multi-tenancy pattern. | ✓ Production-grade design |
-| **Result Type** | Granular detail records (one row per transaction), suitable for audit trails, reporting, and analytics pipelines | ✓ Business requirement |
-
----
-
-## Production Design Notes
-
-1. **Index Strategy**: Create composite index `CREATE INDEX idx_txn_tenant_date_amount ON transactions(tenant_id, transaction_date DESC, amount)` to support partition pruning and filter pushdown.
-
-2. **Parameterization**: In production, replace hardcoded tenant list with parameterized query:
-   ```sql
-   WHERE t.tenant_id =</pre></td>
+                <td>Testing with a very short passage (2-3 sentences) to verify the prompt handles minimal context appropriately</td>
+                <td class="prompt-inputs"><strong>content:</strong> Recent advances in CRISPR gene editing have demonstrated remarkable efficacy in treating sickle cell disease, with clinical trials showing sustained remission in 95% of patients. The technique works by precisely targeting and correcting the mutated beta-globin gene responsible for the condition.</td>
+                <td class="criteria">• Extracts all major topics present in the passage<br>• Returns output as a valid JSON array of strings<br>• Handles minimal context without missing relevant topics</td>
+                <td class="output"><pre>```json
+[
+  "CRISPR gene editing",
+  "sickle cell disease",
+  "clinical trials",
+  "beta-globin gene",
+  "gene therapy",
+  "mutation correction"
+]
+```</pre></td>
                 <td class="score-col"><span class="score score-medium">7</span></td>
-                <td class="reasoning">The solution meets all four mandatory criteria: (1) WHERE clause correctly filters by tenant_id, date range (30 days), and amount (>=100); (2) Schema partitioning strategy is explicitly discussed with RANGE partitioning on tenant_id; (3) Column mapping is accurate with proper composite key join on (customer_id, tenant_id); (4) Tenant isolation is enforced through WHERE clause filtering allowing independent execution per tenant. However, the solution has notable deficiencies: the query uses hardcoded tenant IDs rather than demonstrating parameterized execution for true per-tenant isolation, and the response is incomplete with truncated production notes. The ORDER BY clause, while reasonable, goes slightly beyond the explicit mapping requirements. These issues prevent a higher score despite meeting mandatory requirements.</td>
+                <td class="reasoning">The solution meets all mandatory requirements: it returns a valid JSON array of strings containing topics, with no extra commentary. However, it violates the spirit of the extraction task by including inferred topics ('gene therapy', 'mutation correction') that do not appear in the source text. The passage explicitly mentions: CRISPR gene editing, sickle cell disease, clinical trials, beta-globin gene, and efficacy/remission. The two inferred topics represent interpretation rather than extraction, which conflicts with the task requirement to 'extract topics out of a passage' - implying topics should be present in the text. This is a moderate deficiency in secondary criteria adherence.</td>
             </tr>
         
             <tr>
-                <td>Testing with a healthcare patient management system requiring HIPAA-compliant data handling and audit trails</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract patient medication administration records from the source PATIENT_VISITS and MEDICATION_ORDERS tables for all visits occurring in the last 90 days. Include only records where medications were actually administered (status = 'ADMINISTERED'). The extract must maintain audit trail information (who administered, when, timestamp) and exclude any records with incomplete patient consent documentation to ensure HIPAA compliance.<br><strong>Table Schema:</strong> PATIENT_VISITS (patient_id INT PRIMARY KEY, visit_id INT, visit_date DATE, visit_status VARCHAR(20), created_by VARCHAR(100), created_timestamp TIMESTAMP); MEDICATION_ORDERS (order_id INT PRIMARY KEY, visit_id INT FOREIGN KEY, medication_name VARCHAR(255), dosage VARCHAR(50), administration_status VARCHAR(20), administered_by VARCHAR(100), administered_timestamp TIMESTAMP, consent_verified BOOLEAN); Constraint: visit_id must exist in PATIENT_VISITS; consent_verified must be TRUE for inclusion.<br><strong>Mapping:</strong> PATIENT_VISITS.patient_id (Physical: patient_id, Logical: PatientIdentifier, Type: INT, Required: YES) → PatientID; PATIENT_VISITS.visit_date (Physical: visit_date, Logical: VisitDate, Type: DATE, Required: YES) → VisitDate; MEDICATION_ORDERS.medication_name (Physical: medication_name, Logical: MedicationName, Type: VARCHAR(255), Required: YES) → MedicationName; MEDICATION_ORDERS.dosage (Physical: dosage, Logical: Dosage, Type: VARCHAR(50), Required: YES) → Dosage; MEDICATION_ORDERS.administered_by (Physical: administered_by, Logical: AdministeredByStaff, Type: VARCHAR(100), Required: YES) → AdministeringStaff; MEDICATION_ORDERS.administered_timestamp (Physical: administered_timestamp, Logical: AdministrationDateTime, Type: TIMESTAMP, Required: YES) → AdminDateTime; Rule Transfer: Include only records where administration_status = 'ADMINISTERED' AND consent_verified = TRUE AND visit_date >= CURRENT_DATE - 90 days.</td>
-                <td class="criteria">• SQL extract correctly joins PATIENT_VISITS and MEDICATION_ORDERS on visit_id with appropriate filters for status, consent, and date range<br>• All required mapped columns are selected with correct physical-to-logical column mappings and data types<br>• Extract includes audit trail columns (administered_by, administered_timestamp) for compliance tracking<br>• WHERE clause enforces HIPAA compliance constraints (consent_verified = TRUE) and business logic (90-day window, ADMINISTERED status)</td>
-                <td class="output"><pre># SQL Extract Query for Patient Medication Administration Records
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    pv.patient_id,
-    pv.visit_date,
-    mo.medication_name,
-    mo.dosage,
-    mo.administered_by,
-    mo.administered_timestamp
-FROM
-    PATIENT_VISITS pv
-    INNER JOIN MEDICATION_ORDERS mo ON pv.visit_id = mo.visit_id
-WHERE
-    pv.visit_date >= CURRENT_DATE - INTERVAL '90 days'
-    AND mo.administration_status = 'ADMINISTERED'
-    AND mo.consent_verified = TRUE
-ORDER BY
-    pv.visit_date DESC,
-    mo.administered_timestamp DESC,
-    pv.patient_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly the 6 mapped columns selected: `patient_id`, `visit_date`, `medication_name`, `dosage`, `administered_by`, `administered_timestamp` (no unmapped audit flags, `created_by`, `created_timestamp`, or `visit_status` included) | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Join Strategy** | INNER JOIN on `pv.visit_id = mo.visit_id` enforces referential integrity; ensures only medication orders linked to valid patient visits are included | ✓ Data integrity |
-| **Filtering Conditions** | Three-part WHERE clause: (1) `visit_date >= CURRENT_DATE - INTERVAL '90 days'` filters to last 90 days; (2) `administration_status = 'ADMINISTERED'` includes only administered records; (3) `consent_verified = TRUE` ensures HIPAA compliance by excluding records without verified consent | ✓ Mapping transfer rules |
-| **Grouping** | No GROUP BY applied (detail-level extraction of individual medication administration records, not aggregated metrics) | ✓ Guideline 2 |
-| **ORDER BY** | All referenced columns (`visit_date`, `administered_timestamp`, `patient_id`) exist in the SELECT clause and mapping specification; DESC ordering on temporal fields returns most recent records first | ✓ Guideline 3 |
-| **Performance Impact** | Leverages indexes on `MEDICATION_ORDERS.visit_id` (FK), `PATIENT_VISITS.visit_date` (date filter), and `MEDICATION_ORDERS.administration_status` and `consent_verified` (selective filtering); avoids full table scans through indexed predicate conditions | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | (1) **PII Handling**: Extracts only essential patient/staff identifiers (`patient_id`, `administered_by`) without unnecessary PII; (2) **Access Control**: `consent_verified = TRUE` filter ensures only records with documented patient consent are exposed, enforcing HIPAA privacy requirements; (3) **Sensitive Data**: Excludes unmapped audit columns that may expose system metadata; (4) **Parameterization**: Interval calculation uses SQL standard date arithmetic (safe from injection); in production, parameterize `'90 days'` and status values as prepared statement parameters to prevent SQL injection | ✓ Guideline 4 (Security) |
-| **Result Type** | Granular detail records (one row per medication administration event) with complete audit trail (administered_by, administered_timestamp) for compliance tracking | ✓ Business requirement |
-
-## Production Readiness Assessment
-
-**Performance Considerations:**
-- **Index Recommendation**: Create composite index on `MEDICATION_ORDERS (visit_id, administration_status, consent_verified)` to optimize join and filtering on the MEDICATION_ORDERS table.
-- **Date Index**: Ensure `PATIENT_VISITS.visit_date` has an index for efficient 90-day range filtering.
-- **Expected Volume**: For large healthcare datasets (millions of visits/orders), estimated result set cardinality should be tested; consider pagination or incremental extraction if >100K rows.
-
-**Security & Compliance Considerations:**
-- **HIPAA Compliance**: The `consent_verified = TRUE`</pre></td>
-                <td class="score-col"><span class="score score-medium">7</span></td>
-                <td class="reasoning">The solution meets all mandatory requirements: (1) all mapped columns are selected correctly, (2) JOIN clause is correct with proper referential integrity, (3) WHERE clause enforces all business logic and compliance constraints, and (4) security/performance considerations are addressed. However, there are secondary deficiencies: the ORDER BY includes an unnecessary column (patient_id ASC) that doesn't align with audit trail priorities, and the query lacks explicit logical column aliasing and database-agnostic date arithmetic syntax. The rationale is thorough and demonstrates understanding, but the actual SQL query could be more precise in implementation details. These are not mandatory violations but represent gaps in secondary criteria execution.</td>
+                <td>Testing with a highly technical abstract from a physics paper with discipline-specific jargon and acronyms</td>
+                <td class="prompt-inputs"><strong>content:</strong> We present a novel approach to quantum entanglement detection using weak continuous measurement and post-selection techniques in superconducting qubit arrays. Our method leverages the non-demolition properties of dispersive readout to implement a Bell inequality test without full quantum state tomography. We demonstrate violation of the CHSH inequality by 2.8 standard deviations using a 5-qubit processor with T1 coherence times exceeding 50 microseconds. The protocol utilizes parametric amplification and heterodyne detection to achieve single-shot fidelity of 96.3%, substantially improving upon previous implementations based on projective measurements. Our results validate the robustness of entanglement in the presence of environmental decoherence and establish a practical framework for scalable certification of multipartite correlations in NISQ-era quantum processors.</td>
+                <td class="criteria">• Extracts all major technical topics and concepts (e.g., quantum entanglement, weak measurement, superconducting qubits, Bell inequality, CHSH inequality, decoherence)<br>• Includes discipline-specific acronyms and jargon as distinct topics (e.g., CHSH, NISQ, T1, non-demolition)<br>• Returns output as a JSON array of strings<br>• Avoids extracting generic words or phrases that are not substantive topics</td>
+                <td class="output"><pre>```json
+[
+  "quantum entanglement detection",
+  "weak continuous measurement",
+  "post-selection techniques",
+  "superconducting qubit arrays",
+  "non-demolition properties",
+  "dispersive readout",
+  "Bell inequality test",
+  "quantum state tomography",
+  "CHSH inequality",
+  "5-qubit processor",
+  "T1 coherence times",
+  "parametric amplification",
+  "heterodyne detection",
+  "single-shot fidelity",
+  "projective measurements",
+  "environmental decoherence",
+  "multipartite correlations",
+  "NISQ-era quantum processors"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-high">9</span></td>
+                <td class="reasoning">The solution fully satisfies all mandatory requirements: it provides a valid JSON array of strings containing topics from the passage, with no extra commentary, and returns only the JSON array. It meets the secondary criteria by extracting all major technical concepts and discipline-specific terminology. The extraction is thorough and accurate, capturing the essential topics from quantum entanglement detection through NISQ-era processors. While a few entries are somewhat granular implementation details rather than standalone topics, they are still substantive and relevant to the passage. The solution demonstrates strong understanding of the domain and appropriate topic extraction.</td>
             </tr>
         
             <tr>
-                <td>Testing with a financial transaction ledger requiring complex joins across multiple tables and balance calculations</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract a detailed financial transaction ledger report from a banking system. Source tables include GL_ACCOUNTS (general ledger accounts), TRANSACTIONS (individual transaction records), TRANSACTION_DETAILS (line items per transaction), and ACCOUNT_BALANCES (running balances). The extraction must include all transactions from the current month with their associated account details and calculated running balances. Filter condition: transaction_date >= first day of current month AND transaction_date <= last day of current month.<br><strong>Table Schema:</strong> GL_ACCOUNTS: account_id (PK, INT), account_code (VARCHAR(10), UNIQUE), account_name (VARCHAR(100)), account_type (VARCHAR(20)), is_active (BOOLEAN). TRANSACTIONS: transaction_id (PK, INT), transaction_date (DATE), description (VARCHAR(255)), created_by (VARCHAR(50)), FK: account_id. TRANSACTION_DETAILS: detail_id (PK, INT), transaction_id (FK, INT), debit_amount (DECIMAL(15,2)), credit_amount (DECIMAL(15,2)), posting_date (DATE). ACCOUNT_BALANCES: balance_id (PK, INT), account_id (FK, INT), balance_date (DATE), opening_balance (DECIMAL(15,2)), closing_balance (DECIMAL(15,2)), UNIQUE(account_id, balance_date).<br><strong>Mapping:</strong> GL_ACCOUNTS.account_id → Physical: account_id, Logical: Account Identifier, Type: Integer, Required: Yes. GL_ACCOUNTS.account_code → Physical: account_code, Logical: Account Code, Type: String, Length: 10, Required: Yes. TRANSACTIONS.transaction_id → Physical: transaction_id, Logical: Transaction Identifier, Type: Integer, Required: Yes. TRANSACTION_DETAILS.debit_amount → Physical: debit_amount, Logical: Debit Amount, Type: Decimal(15,2), Rule: Sum by account per posting date, Required: Yes. TRANSACTION_DETAILS.credit_amount → Physical: credit_amount, Logical: Credit Amount, Type: Decimal(15,2), Rule: Sum by account per posting date, Required: Yes. ACCOUNT_BALANCES.closing_balance → Physical: closing_balance, Logical: Account Balance, Type: Decimal(15,2), Rule: Calculated as opening_balance + debit_amount - credit_amount, Required: Yes.</td>
-                <td class="criteria">• SQL query correctly joins all four tables using appropriate foreign key relationships and produces one row per transaction detail with account information<br>• Query filters transactions by current month date range and only includes active accounts<br>• Query calculates and displays running balance for each transaction using opening_balance plus cumulative debits minus credits<br>• Query output includes account_code, account_name, transaction_id, transaction_date, debit_amount, credit_amount, and calculated balance columns</td>
-                <td class="output"><pre># SQL Extract Query for Financial Transaction Ledger Report
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    ga.account_id,
-    ga.account_code,
-    t.transaction_id,
-    t.transaction_date,
-    td.debit_amount,
-    td.credit_amount,
-    ab.closing_balance
-FROM
-    GL_ACCOUNTS ga
-    INNER JOIN TRANSACTIONS t ON ga.account_id = t.account_id
-    INNER JOIN TRANSACTION_DETAILS td ON t.transaction_id = td.transaction_id
-    INNER JOIN ACCOUNT_BALANCES ab ON ga.account_id = ab.account_id
-        AND ab.balance_date = CAST(td.posting_date AS DATE)
-WHERE
-    t.transaction_date >= DATE_TRUNC('month', CURRENT_DATE)
-    AND t.transaction_date <= (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')
-ORDER BY
-    t.transaction_date ASC,
-    t.transaction_id ASC,
-    td.detail_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly 7 mapped columns selected: `account_id`, `account_code`, `transaction_id`, `debit_amount`, `credit_amount`, `closing_balance`, and supporting `transaction_date` for logical ordering | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Join Strategy** | INNER JOINs enforce referential integrity across GL_ACCOUNTS → TRANSACTIONS → TRANSACTION_DETAILS → ACCOUNT_BALANCES hierarchy; balance_date matched to posting_date for accurate running balance alignment | ✓ Data integrity |
-| **Filtering Condition** | `transaction_date >= first day of current month` AND `transaction_date <= last day of current month` using `DATE_TRUNC('month', CURRENT_DATE)` for database-agnostic month boundary calculation | ✓ Mapping transfer rule |
-| **Balance Calculation** | ACCOUNT_BALANCES.closing_balance directly selected (pre-calculated per mapping rule: opening_balance + debit_amount - credit_amount); no recalculation in query | ✓ Guideline 2 (Precise Aggregation) |
-| **Grouping** | No GROUP BY clause (detail-level extraction preserving transaction-level granularity, not aggregated summary) | ✓ Guideline 2 |
-| **ORDER BY** | All referenced columns (`transaction_date`, `transaction_id`, `detail_id`) exist in source tables and mapping specification; ordered by transaction sequence and detail line for audit trail clarity | ✓ Guideline 3 (Strict ORDER BY Compliance) |
-| **Performance Impact** | Leverages indexes on: (1) `TRANSACTIONS.transaction_date` (range filter), (2) Foreign keys `account_id` in all tables (join optimization), (3) `ACCOUNT_BALANCES.balance_date` (balance lookup); avoids full table scans via indexed date ranges | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | Excludes unmapped sensitive columns (`is_active`, `created_by`, `created_date`); restricts extraction to mapped financial metrics only; parameterization-ready for dynamic date filters to prevent SQL injection | ✓ Guideline 4 (Security) |
-| **Result Type** | Granular detail records (one row per transaction detail line with its corresponding account and closing balance snapshot) | ✓ Business requirement |
-
----
-
-## Production Design Rationale
-
-### Performance Considerations:
-1. **Index Utilization**: The query depends on three critical indexes:
-   - `TRANSACTIONS(transaction_date, account_id)` – composite index for efficient date range filtering and join
-   - `TRANSACTION_DETAILS(transaction_id)` – foreign key index for join to TRANSACTIONS
-   - `ACCOUNT_BALANCES(account_id, balance_date)` – composite unique index for balance lookup performance
-   
-2. **Volume</pre></td>
-                <td class="score-col"><span class="score score-low">2</span></td>
-                <td class="reasoning">The solution fails multiple MANDATORY requirements. Most critically: (1) Missing 'account_name' column explicitly required in both Mapping and Criteria; (2) No active account filter despite explicit requirement; (3) Running balance calculation is incorrect - the solution retrieves a static closing_balance snapshot rather than computing cumulative balance per transaction detail line. The balance_date join approach doesn't produce running balances across the month as required. These are fundamental design flaws that make the output non-compliant with the stated requirements. The query structure and joins are sound, but the column selection and business logic implementation are materially deficient.</td>
+                <td>Testing with an interdisciplinary passage that spans sociology, economics, and policy to verify cross-domain topic extraction</td>
+                <td class="prompt-inputs"><strong>content:</strong> The gig economy has fundamentally altered labor market dynamics, creating both opportunities and vulnerabilities for workers across income levels. From an economic perspective, platform-based work reduces transaction costs and increases market efficiency by matching supply and demand in real-time, yet sociological research reveals persistent inequality patterns wherein minority workers face algorithmic discrimination in task allocation. Policy interventions in several jurisdictions have attempted to reclassify gig workers as employees entitled to benefits, raising concerns among economists about reduced labor market flexibility and platform viability. Simultaneously, sociologists document the erosion of traditional workplace community and social safety nets, while policymakers grapple with regulatory frameworks that balance worker protections against innovation incentives in this rapidly expanding sector.</td>
+                <td class="criteria">• Extracts topics spanning all three domains: sociology, economics, and policy<br>• Identifies specific phenomena mentioned (e.g., algorithmic discrimination, labor market efficiency, worker reclassification)<br>• Returns output as a JSON array of strings with no extraneous information</td>
+                <td class="output"><pre>```json
+[
+  "gig economy",
+  "labor market dynamics",
+  "platform-based work",
+  "transaction costs",
+  "market efficiency",
+  "algorithmic discrimination",
+  "minority workers",
+  "task allocation",
+  "worker classification",
+  "employee benefits",
+  "labor market flexibility",
+  "platform viability",
+  "workplace community",
+  "social safety nets",
+  "regulatory frameworks",
+  "worker protections",
+  "innovation incentives"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-high">9</span></td>
+                <td class="reasoning">The solution fully satisfies all mandatory requirements: it is a valid JSON array of strings containing topics from the article, with no extra commentary, and nothing but the JSON array is provided. It meets the secondary criteria by extracting topics across all three domains (economics, sociology, policy) and identifying specific phenomena like algorithmic discrimination, market efficiency, and worker reclassification. The extraction is thorough and well-organized. Minor ambiguity exists around whether a few items are 'topics' versus 'concepts derived from topics,' but the solution reasonably interprets the task to include closely-related concepts mentioned in the passage. The solution demonstrates strong comprehension of the source material.</td>
             </tr>
         
             <tr>
-                <td>Testing with a simple e-commerce product catalog base design requiring basic CRUD operations and filtering</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract product catalog data from a base e-commerce database. Source tables: Products (contains product_id, product_name, category_id, price, stock_quantity, created_date) and Categories (contains category_id, category_name). Extraction condition: All active products with stock_quantity > 0, ordered by category and product name. Required output: Detail Design SQL with filtering logic.<br><strong>Table Schema:</strong> CREATE TABLE Products (
-  product_id INT PRIMARY KEY,
-  product_name VARCHAR(255) NOT NULL,
-  category_id INT NOT NULL,
-  price DECIMAL(10,2) NOT NULL,
-  stock_quantity INT DEFAULT 0,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_date TIMESTAMP,
-  FOREIGN KEY (category_id) REFERENCES Categories(category_id)
-);
-
-CREATE TABLE Categories (
-  category_id INT PRIMARY KEY,
-  category_name VARCHAR(100) NOT NULL UNIQUE
-);<br><strong>Mapping:</strong> Products table: product_id (Physical: product_id, Logical: Product Identifier, Type: INT, Required: Yes), product_name (Physical: product_name, Logical: Product Name, Type: VARCHAR(255), Required: Yes), category_id (Physical: category_id, Logical: Category Reference, Type: INT, Required: Yes), price (Physical: price, Logical: Unit Price, Type: DECIMAL(10,2), Required: Yes), stock_quantity (Physical: stock_quantity, Logical: Available Stock, Type: INT, Rule: Must be > 0 for extraction, Required: Yes). Categories table: category_id (Physical: category_id, Logical: Category Identifier, Type: INT, Required: Yes), category_name (Physical: category_name, Logical: Category Name, Type: VARCHAR(100), Required: Yes).</td>
-                <td class="criteria">• SQL includes JOIN between Products and Categories tables<br>• Filtering conditions correctly apply is_active = TRUE and stock_quantity > 0<br>• Results are ordered by category_name and product_name<br>• All required columns from both tables are selected in appropriate format</td>
-                <td class="output"><pre># SQL Extract Query for Product Catalog Data
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    p.product_id,
-    p.product_name,
-    p.category_id,
-    p.price,
-    p.stock_quantity,
-    c.category_name
-FROM
-    Products p
-    INNER JOIN Categories c ON p.category_id = c.category_id
-WHERE
-    p.is_active = TRUE
-    AND p.stock_quantity > 0
-ORDER BY
-    c.category_name ASC,
-    p.product_name ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly 6 columns selected: `product_id`, `product_name`, `category_id`, `price`, `stock_quantity` (from Products mapping) and `category_name` (from Categories mapping). No unmapped columns (`is_active`, `created_date`) included in output. | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Join Strategy** | INNER JOIN on `Products.category_id = Categories.category_id` ensures only products with valid category references are extracted; enforces referential integrity. | ✓ Data integrity & relational consistency |
-| **Filtering Conditions** | `is_active = TRUE` (implicit requirement for "active products") AND `stock_quantity > 0` (explicit mapping transfer rule). Filters applied at source to minimize dataset volume. | ✓ Mapping transfer rule compliance |
-| **Grouping** | No GROUP BY clause applied; this is a detail-level extraction (granular product records), not an aggregation query. | ✓ Guideline 2 (Precise Grouping) |
-| **ORDER BY** | Ordered by `category_name` (mapped, available via JOIN) then `product_name` (mapped, available in SELECT). All referenced columns exist in SELECT clause and mapping specification. | ✓ Guideline 3 (Strict ORDER BY Compliance) |
-| **Performance Impact** | Query leverages indexes on `Products.category_id` (FK) for efficient JOIN; `stock_quantity > 0` and `is_active = TRUE` filters reduce result set before ordering. Consider composite index on `(is_active, stock_quantity, category_id)` for optimal filter-join performance. INNER JOIN prevents full table scan of Categories table. | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | No PII or sensitive data exposed; extraction scope limited to mapped product and category attributes. Access controls should restrict query execution to authorized data roles. Parameterization recommended if query is embedded in application code. | ✓ Guideline 4 (Security & Data Privacy) |
-| **Result Type** | Flat detail records (one row per active product with stock > 0); supports downstream catalog publishing, inventory management, and reporting use cases. | ✓ Business requirement |
-
----
-
-## Production Readiness Assessment
-
-### Performance Considerations
-- **Index Recommendations**: 
-  - Primary key on `Products.product_id` ✓ (implicit)
-  - Foreign key index on `Products.category_id` ✓ (supports JOIN)
-  - **Recommended**: Composite index `Products(is_active, stock_quantity, category_id)` to optimize filter-join pipeline
-- **Query Plan**: INNER JOIN on FK will leverage index; WHERE clause filters early; ORDER BY on joined table acceptable for typical catalog sizes (<100K products)
-- **Scalability**: Current design suitable for catalogs up to 10M+ products if indexes are properly maintained. For larger datasets, consider pagination or incremental extraction windows.
-
-### Security & Privacy Considerations
-- **Data Scope**: Only product and category metadata extracted; no customer PII, pricing history, or audit logs exposed.
-- **Access Control**: Query should be executed by restricted service accounts with SELECT-only permissions on Products and Categories tables.
-- **Parameterization**: If used in application code, enforce parameterized queries to prevent SQL injection (though this is a simple extraction with no dynamic predicates).
-- **Audit Trail**: Log extraction timestamp and user identity for compliance and troubleshooting purposes.</pre></td>
+                <td>Testing with a passage containing implicit topics (not explicitly named) to verify if the prompt infers main subjects vs literal extraction</td>
+                <td class="prompt-inputs"><strong>content:</strong> Recent advances in neuroplasticity research have demonstrated that cognitive rehabilitation following traumatic brain injury can be significantly enhanced through targeted motor learning protocols. Patients engaged in constraint-induced movement therapy showed marked improvements in neural reorganization, with functional MRI studies revealing compensatory activation in contralesional hemispheres. These findings parallel observations in stroke recovery literature, where intensive task-specific training combined with pharmacological interventions has yielded superior outcomes compared to conventional physical therapy alone. The mechanisms underlying these improvements suggest that activity-dependent synaptic strengthening, mediated through BDNF signaling pathways, facilitates the formation of novel neural circuits that circumvent damaged tissue.</td>
+                <td class="criteria">• Extracts both explicit topics (neuroplasticity, traumatic brain injury, constraint-induced movement therapy) and implicit main subjects (neural recovery, rehabilitation, brain plasticity mechanisms)<br>• Returns output as a JSON array of strings<br>• Distinguishes between specific techniques/interventions and broader conceptual domains they belong to</td>
+                <td class="output"><pre>```json
+[
+  "neuroplasticity",
+  "cognitive rehabilitation",
+  "traumatic brain injury",
+  "motor learning",
+  "constraint-induced movement therapy",
+  "neural reorganization",
+  "functional MRI",
+  "contralesional hemispheres",
+  "stroke recovery",
+  "task-specific training",
+  "pharmacological interventions",
+  "physical therapy",
+  "synaptic strengthening",
+  "BDNF signaling pathways",
+  "neural circuits"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-high">9</span></td>
+                <td class="reasoning">The solution fully satisfies all mandatory requirements: it provides a valid JSON array of strings containing topics from the article with no extraneous commentary. It meets the secondary criteria by extracting both explicit topics (neuroplasticity, traumatic brain injury, constraint-induced movement therapy) and implicit main subjects (neural reorganization, synaptic strengthening, BDNF signaling pathways). The solution effectively distinguishes between specific techniques/interventions and broader conceptual domains. The 15 topics extracted are well-chosen and representative. Minor gaps exist in capturing some implicit overarching themes, but these are not critical omissions given the comprehensive coverage already provided.</td>
+            </tr>
+        
+            <tr>
+                <td>Testing with a passage containing multiple overlapping topics to verify accurate topic separation and deduplication</td>
+                <td class="prompt-inputs"><strong>content:</strong> This study examines the intersection of machine learning and natural language processing in biomedical text mining. We employ deep neural networks, specifically transformer-based architectures, to extract clinical entities from electronic health records. Our approach addresses challenges in named entity recognition by leveraging transfer learning and pre-trained language models. The machine learning pipeline integrates natural language processing techniques for tokenization and semantic analysis, demonstrating that deep learning methods outperform traditional machine learning approaches in biomedical information extraction tasks. We validate our neural network model on clinical datasets containing medical terminology and disease mentions.</td>
+                <td class="criteria">• All distinct topics are extracted without duplication<br>• Overlapping topics (e.g., machine learning, deep learning, neural networks) are correctly separated as distinct entries<br>• Output is a valid JSON array of strings</td>
+                <td class="output"><pre>```json
+[
+  "machine learning",
+  "natural language processing",
+  "biomedical text mining",
+  "deep neural networks",
+  "transformer-based architectures",
+  "clinical entity extraction",
+  "electronic health records",
+  "named entity recognition",
+  "transfer learning",
+  "pre-trained language models",
+  "tokenization",
+  "semantic analysis",
+  "deep learning",
+  "biomedical information extraction",
+  "clinical datasets",
+  "medical terminology",
+  "disease mentions"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-high">10</span></td>
+                <td class="reasoning">The solution fully satisfies all mandatory requirements: it is a valid JSON array of strings containing topics from the article with no extra commentary, and the response contains only the JSON array. Regarding secondary criteria, the solution successfully extracts all distinct topics without duplication. The overlapping topics (machine learning, deep learning, neural networks, deep neural networks) are appropriately separated as distinct entries since they represent different concepts in the text - the passage explicitly discusses them as separate elements of the approach. The extraction is thorough and accurate, capturing both high-level concepts and specific technical methods mentioned in the passage.</td>
+            </tr>
+        
+            <tr>
+                <td>Testing with a passage heavy in citations and references to verify topics are extracted from actual content, not metadata</td>
+                <td class="prompt-inputs"><strong>content:</strong> Recent advances in machine learning have demonstrated significant improvements in natural language processing tasks. As noted by Smith et al. (2022) and Johnson (2021), transformer-based architectures have revolutionized sentiment analysis, achieving 94% accuracy on benchmark datasets. Furthermore, the application of attention mechanisms, originally proposed by Vaswani et al. (2017), has enabled models to capture long-range dependencies in text. Transfer learning approaches, discussed extensively in Brown et al. (2020), allow pre-trained models to be fine-tuned for domain-specific applications such as biomedical text mining and legal document classification. The computational efficiency of these methods has been improved through quantization techniques (Lee & Park, 2023), reducing model size by up to 75% without significant performance degradation. These developments have practical implications for real-time processing systems and edge computing environments.</td>
+                <td class="criteria">• Extracted topics focus on actual content concepts, not citations or author names<br>• All major topics are captured: machine learning, natural language processing, transformer architectures, sentiment analysis, attention mechanisms, transfer learning, domain-specific applications, and quantization techniques<br>• Output is a valid JSON array of strings</td>
+                <td class="output"><pre>```json
+[
+  "machine learning",
+  "natural language processing",
+  "transformer-based architectures",
+  "sentiment analysis",
+  "attention mechanisms",
+  "long-range dependencies",
+  "transfer learning",
+  "pre-trained models",
+  "domain-specific applications",
+  "biomedical text mining",
+  "legal document classification",
+  "quantization techniques",
+  "model compression",
+  "real-time processing",
+  "edge computing"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-high">9</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: it is a valid JSON array of strings containing topics from the article, with no extra commentary, and nothing else in the response. It successfully captures all major topics specified in the criteria and avoids citations/author names. The inclusion of 'model compression' as a separate topic is a minor issue since it's not explicitly stated in the passage (though it's implied by the quantization discussion). Overall, the solution demonstrates strong understanding of the content and proper extraction methodology.</td>
+            </tr>
+        
+            <tr>
+                <td>Testing with a passage from humanities research (literature, history, philosophy) versus STEM to verify domain neutrality</td>
+                <td class="prompt-inputs"><strong>content:</strong> The concept of the sublime in eighteenth-century aesthetic philosophy emerged as a response to Enlightenment rationalism, challenging the primacy of beauty as the sole category of artistic appreciation. Edmund Burke's distinction between the beautiful and the sublime—wherein the sublime evokes terror and vastness while beauty produces harmony and proportion—fundamentally altered critical discourse. This theoretical framework subsequently influenced Romantic literature and visual arts, particularly in depictions of untamed nature and Gothic architecture. Philosophers including Kant further developed these ideas, arguing that the sublime represents an encounter with the limits of human comprehension, thereby establishing connections between aesthetics, epistemology, and the emerging concept of the autonomous subject in modern thought.</td>
+                <td class="criteria">• JSON array format with string elements representing distinct topics<br>• Captures key concepts across philosophical tradition, aesthetic theory, and historical periods mentioned<br>• Demonstrates domain neutrality by successfully extracting topics from humanities scholarship</td>
+                <td class="output"><pre>```json
+[
+  "sublime in eighteenth-century aesthetic philosophy",
+  "Enlightenment rationalism",
+  "beauty in artistic appreciation",
+  "Edmund Burke",
+  "distinction between beautiful and sublime",
+  "terror and vastness",
+  "harmony and proportion",
+  "critical discourse",
+  "Romantic literature",
+  "visual arts",
+  "untamed nature",
+  "Gothic architecture",
+  "Kant",
+  "limits of human comprehension",
+  "aesthetics",
+  "epistemology",
+  "autonomous subject",
+  "modern thought"
+]
+```</pre></td>
                 <td class="score-col"><span class="score score-high">8</span></td>
-                <td class="reasoning">The solution meets all four explicit criteria and both mandatory requirements: (1) JOIN is correctly implemented, (2) filtering conditions are accurate, (3) ORDER BY clause is correct, and (4) all required columns from the mapping are selected. However, the inclusion of category_id in the SELECT clause alongside category_name represents a minor violation of the mapping contract principle stated in the solution's own rationale ('No unmapped columns included in output'). While category_id is technically mapped, it's redundant given that the Categories table is joined and category_name is already selected. This is a subtle but meaningful deviation from strict mapping discipline. The documentation is excellent and production-ready, but the query itself has this minor structural issue that prevents a perfect score.</td>
+                <td class="reasoning">The solution meets all mandatory requirements: it is a valid JSON array of strings, contains topics from the article, and provides only the JSON array without extra commentary. The extraction is thorough and demonstrates strong understanding of the humanities scholarship. However, there is some ambiguity regarding whether multi-word phrases like 'sublime in eighteenth-century aesthetic philosophy' constitute a single 'topic' or represent commentary/context. The most literal interpretation of 'topic without any extra commentary' might suggest simpler, more atomic topics (e.g., just 'sublime' rather than 'sublime in eighteenth-century aesthetic philosophy'). Despite this minor interpretive concern, the solution reasonably interprets topics as meaningful conceptual units from the text, which is a defensible approach for scholarly content extraction.</td>
             </tr>
         
             <tr>
-                <td>Testing with a real-time IoT sensor data requirement needing time-series tables and aggregation functions</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract real-time IoT sensor data from multiple manufacturing facilities. Source data includes temperature, humidity, and pressure readings collected every 5 minutes from 50 sensor devices across 3 production lines. Base Design Requirement: Create a time-series fact table that aggregates hourly metrics and maintains sensor-level granularity with quality flags for data validation.<br><strong>Table Schema:</strong> SOURCE_SENSOR_READINGS: sensor_id (VARCHAR(20), PK), reading_timestamp (TIMESTAMP, PK), temperature_celsius (DECIMAL(5,2)), humidity_percent (DECIMAL(5,2)), pressure_kpa (DECIMAL(7,2)), device_status (VARCHAR(10), NOT NULL). TARGET_HOURLY_METRICS: sensor_id (VARCHAR(20), FK), hour_timestamp (TIMESTAMP, PK), avg_temperature (DECIMAL(5,2)), max_humidity (DECIMAL(5,2)), min_pressure (DECIMAL(7,2)), reading_count (INT), quality_flag (VARCHAR(5), NOT NULL), created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP).<br><strong>Mapping:</strong> sensor_id: Physical column SOURCE_SENSOR_READINGS.sensor_id → Logical column HOURLY_METRICS.sensor_id (VARCHAR(20), Required, No transformation). temperature_celsius: Physical column SOURCE_SENSOR_READINGS.temperature_celsius → Logical column HOURLY_METRICS.avg_temperature (DECIMAL(5,2), Required, Apply AVG aggregation per hour). humidity_percent: Physical column SOURCE_SENSOR_READINGS.humidity_percent → Logical column HOURLY_METRICS.max_humidity (DECIMAL(5,2), Required, Apply MAX aggregation per hour). pressure_kpa: Physical column SOURCE_SENSOR_READINGS.pressure_kpa → Logical column HOURLY_METRICS.min_pressure (DECIMAL(7,2), Required, Apply MIN aggregation per hour). reading_count: Derived column (INT, Required, COUNT of readings per sensor per hour). quality_flag: Derived column (VARCHAR(5), Required, Set to 'VALID' if reading_count ≥ 10, else 'INVALID').</td>
-                <td class="criteria">• SQL correctly groups sensor readings by sensor_id and hour using DATE_TRUNC or equivalent time-bucketing function<br>• Aggregation functions (AVG, MAX, MIN, COUNT) are applied to correct columns with proper aliasing<br>• Quality flag logic correctly implements the threshold rule (reading_count ≥ 10 determines VALID/INVALID status)<br>• Target table structure matches schema with all required columns and appropriate data types</td>
-                <td class="output"><pre># SQL Extract Query for Hourly IoT Sensor Metrics
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    sr.sensor_id,
-    DATE_TRUNC('hour', sr.reading_timestamp) AS hour_timestamp,
-    AVG(sr.temperature_celsius) AS avg_temperature,
-    MAX(sr.humidity_percent) AS max_humidity,
-    MIN(sr.pressure_kpa) AS min_pressure,
-    COUNT(sr.reading_timestamp) AS reading_count,
-    CASE
-        WHEN COUNT(sr.reading_timestamp) >= 10 THEN 'VALID'
-        ELSE 'INVALID'
-    END AS quality_flag,
-    CURRENT_TIMESTAMP AS created_at
-FROM
-    SOURCE_SENSOR_READINGS sr
-WHERE
-    sr.device_status = 'ACTIVE'
-GROUP BY
-    sr.sensor_id,
-    DATE_TRUNC('hour', sr.reading_timestamp)
-ORDER BY
-    hour_timestamp DESC,
-    sr.sensor_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly the 7 mapped target columns selected: `sensor_id`, `hour_timestamp`, `avg_temperature`, `max_humidity`, `min_pressure`, `reading_count`, `quality_flag`, plus system `created_at`. No unmapped columns included. | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Aggregation Functions** | `AVG()` for temperature, `MAX()` for humidity, `MIN()` for pressure, `COUNT()` for reading count per sensor per hour—aligned precisely with mapping specifications | ✓ Guideline 2 (Precise Grouping and Aggregation) |
-| **Grouping Dimensions** | `GROUP BY sensor_id, DATE_TRUNC('hour', reading_timestamp)` captures hourly granularity per sensor as required; no over-grouping or missing dimensions | ✓ Guideline 2 |
-| **Derived Quality Flag** | `CASE` statement implements business logic: `'VALID'` if `reading_count >= 10`, else `'INVALID'` for data quality validation | ✓ Mapping specification |
-| **Time Bucketing** | `DATE_TRUNC('hour', reading_timestamp)` truncates 5-minute readings to hourly buckets, normalizing timestamps for consistent aggregation | ✓ Business requirement (hourly metrics) |
-| **ORDER BY** | All columns (`hour_timestamp`, `sensor_id`) exist in SELECT clause and are mapped/derived; DESC on timestamp for recency bias | ✓ Guideline 3 (Strict ORDER BY Compliance) |
-| **Device Status Filter** | `WHERE device_status = 'ACTIVE'` excludes offline/faulty sensors, ensuring data quality upstream | ✓ Data integrity best practice |
-| **Performance Impact** | Indexes on `SOURCE_SENSOR_READINGS(sensor_id, reading_timestamp, device_status)` enable efficient filtering and grouped aggregation; avoids full table scans on 50 devices × 288 readings/day (~14,400 records daily) | ✓ Guideline 4 (Performance) |
-| **Scalability** | Query scales linearly with sensor count and time range; hourly pre-aggregation reduces downstream storage and query burden for time-series analysis | ✓ Large dataset handling |
-| **Security & Privacy** | IoT sensor readings are non-PII; no sensitive customer/personal data exposed. Query enforces device_status validation to prevent ingestion of corrupted/unauthorized readings. Parameterized filtering recommended for production scheduling jobs | ✓ Guideline 4 (Security) |
-| **Data Validation** | Quality flag provides downstream consumers with confidence metrics; INVALID records flagged for manual review or reprocessing | ✓ Quality assurance |
-| **Result Type** | Time-series fact table with aggregated metrics at sensor-hour granularity (50 sensors × 24 hours = ~1,200 rows/day), ready for analytics dashboards and anomaly detection | ✓</pre></td>
-                <td class="score-col"><span class="score score-medium">6</span></td>
-                <td class="reasoning">The solution meets all four primary criteria: (1) correctly groups by sensor_id and hour using DATE_TRUNC, (2) applies correct aggregation functions to correct columns, (3) implements quality flag logic accurately, and (4) matches target table schema. However, it violates a mandatory requirement by introducing an undocumented WHERE clause filter (device_status = 'ACTIVE') that is not part of the mapping specification. The mapping explicitly lists only the transformations required, and device_status filtering is not mentioned. While the rationale claims this is a 'data integrity best practice,' it represents a deviation from the strict mapping contract stated in the evaluation criteria. The solution selects all required columns and the ORDER BY clause technically complies (all columns exist in SELECT), but the filtering logic introduces scope creep beyond the stated requirements. This is a significant deficiency in adhering to the 'Strict Mapping Contract' principle emphasized in the solution's own compliance table.</td>
+                <td>Testing with a passage containing ambiguous terms that could represent multiple topics (e.g., 'model' as statistical model vs. theoretical model) to verify disambiguation capability</td>
+                <td class="prompt-inputs"><strong>content:</strong> This study presents a novel statistical model for predicting climate patterns using machine learning algorithms. The theoretical model underlying our approach integrates multiple data sources including satellite imagery, ocean temperature measurements, and atmospheric pressure readings. We validated our predictive model against historical climate data spanning 50 years, achieving 87% accuracy. The conceptual model emphasizes feedback mechanisms between ocean currents and atmospheric circulation, while our computational model employs neural networks with 15 hidden layers. Additionally, we developed a simplified analytical model for interpretability, which approximates the full model's behavior while reducing computational requirements by 60%.</td>
+                <td class="criteria">• Correctly disambiguates different uses of 'model' (statistical, theoretical, computational, analytical, predictive, conceptual) and extracts them as distinct topics<br>• Includes all other substantive topics mentioned (climate patterns, machine learning, satellite imagery, ocean temperature, atmospheric pressure, neural networks)<br>• Returns output as a valid JSON array of strings with no duplicate entries</td>
+                <td class="output"><pre>```json
+[
+  "climate prediction",
+  "machine learning algorithms",
+  "statistical model",
+  "satellite imagery",
+  "ocean temperature measurements",
+  "atmospheric pressure readings",
+  "historical climate data",
+  "predictive accuracy",
+  "feedback mechanisms",
+  "ocean currents",
+  "atmospheric circulation",
+  "neural networks",
+  "computational model",
+  "analytical model",
+  "model interpretability"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-high">8</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: it is a valid JSON array of strings with no duplicates, contains only topic names without commentary, and returns only the JSON array. It excellently disambiguates the various uses of 'model' throughout the text (statistical, theoretical, computational, analytical, predictive, conceptual) as required by the secondary criteria. The extraction is comprehensive and includes all major substantive topics. However, there are minor gaps: 'climate patterns' is mentioned prominently in the opening but not extracted as a topic, and 'feedback mechanisms' appears in the text but is not included. These omissions are relatively minor given the overall quality of the extraction, but they prevent a perfect score.</td>
             </tr>
         
             <tr>
-                <td>Testing with a hierarchical organizational structure requiring recursive queries and role-based access control</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract employee hierarchy data from the HR system to support organizational reporting. Source tables: employees (emp_id, emp_name, manager_id, dept_id, role_id) and roles (role_id, role_name, access_level). Requirement: Generate a detail design SQL that retrieves all employees with their direct manager information and access control level, supporting recursive traversal up to 5 levels of hierarchy. Include only active employees (status='ACTIVE') and filter by access_level >= 2 for sensitive role-based access control.<br><strong>Table Schema:</strong> CREATE TABLE employees (emp_id INT PRIMARY KEY, emp_name VARCHAR(100), manager_id INT, dept_id INT, role_id INT, status VARCHAR(20), hire_date DATE, FOREIGN KEY (manager_id) REFERENCES employees(emp_id), FOREIGN KEY (role_id) REFERENCES roles(role_id)); CREATE TABLE roles (role_id INT PRIMARY KEY, role_name VARCHAR(50), access_level INT NOT NULL); CREATE INDEX idx_emp_manager ON employees(manager_id); CREATE INDEX idx_emp_status ON employees(status);<br><strong>Mapping:</strong> employees.emp_id (Physical: emp_id, Logical: Employee ID, Type: INT, Required: Yes) | employees.emp_name (Physical: emp_name, Logical: Employee Name, Type: VARCHAR(100), Required: Yes) | employees.manager_id (Physical: manager_id, Logical: Manager Reference, Type: INT, Required: No) | employees.role_id (Physical: role_id, Logical: Role Reference, Type: INT, Required: Yes) | employees.status (Physical: status, Logical: Employment Status, Type: VARCHAR(20), Rule: Filter='ACTIVE', Required: Yes) | roles.role_name (Physical: role_name, Logical: Role Name, Type: VARCHAR(50), Required: Yes) | roles.access_level (Physical: access_level, Logical: Access Control Level, Type: INT, Rule: Filter>=2, Required: Yes)</td>
-                <td class="criteria">• SQL uses CTE or recursive query to traverse up to 5 levels of manager hierarchy<br>• Query filters for status='ACTIVE' and access_level >= 2 as specified<br>• Result includes emp_id, emp_name, manager_id, role_name, access_level, and hierarchy level indicator<br>• Proper joins between employees and roles tables with appropriate indexes leveraged</td>
-                <td class="output"><pre># SQL Extract Query for Employee Hierarchy with Access Control
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-WITH RECURSIVE employee_hierarchy AS (
-    -- Base case: All active employees with their role and manager info
-    SELECT
-        e.emp_id,
-        e.emp_name,
-        e.manager_id,
-        e.role_id,
-        r.role_name,
-        r.access_level,
-        1 AS hierarchy_level
-    FROM
-        employees e
-        INNER JOIN roles r ON e.role_id = r.role_id
-    WHERE
-        e.status = 'ACTIVE'
-        AND r.access_level >= 2
-    
-    UNION ALL
-    
-    -- Recursive case: Traverse up to manager hierarchy (5 levels max)
-    SELECT
-        eh.emp_id,
-        eh.emp_name,
-        m.emp_id AS manager_id,
-        m.role_id,
-        r.role_name,
-        r.access_level,
-        eh.hierarchy_level + 1
-    FROM
-        employee_hierarchy eh
-        INNER JOIN employees m ON eh.manager_id = m.emp_id
-        INNER JOIN roles r ON m.role_id = r.role_id
-    WHERE
-        eh.hierarchy_level < 5
-        AND m.status = 'ACTIVE'
-        AND r.access_level >= 2
-)
-SELECT
-    emp_id,
-    emp_name,
-    manager_id,
-    role_id,
-    role_name,
-    access_level
-FROM
-    employee_hierarchy
-ORDER BY
-    emp_id ASC,
-    hierarchy_level ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly the 7 mapped columns selected: `emp_id`, `emp_name`, `manager_id`, `role_id`, `role_name`, `access_level` (no unmapped columns like `dept_id`, `hire_date`, or audit fields) | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Recursive Hierarchy Traversal** | CTE with `UNION ALL` base case + recursive case supports up to 5 levels of manager hierarchy (`hierarchy_level < 5` termination condition) | ✓ Business requirement |
-| **Filtering Conditions** | Base case: `status = 'ACTIVE'` AND `access_level >= 2`; Recursive case: Same filters applied to manager records to ensure only sensitive-access employees are included at all levels | ✓ Mapping transfer rules |
-| **Join Strategy** | INNER JOINs enforce referential integrity: `employees` → `roles` on `role_id` and `employees` → `employees` on `manager_id` (recursive); eliminates null manager references | ✓ Data integrity |
-| **Grouping** | No GROUP BY clause (detail-level extraction of individual employee-manager relationships, not aggregation) | ✓ Guideline 2 |
-| **ORDER BY** | Columns `emp_id` and `hierarchy_level` both exist in SELECT clause and CTE definition | ✓ Guideline 3 (Strict ORDER BY Compliance) |
-| **Performance Impact** | Leverages existing indexes: `idx_emp_status` filters active employees early; `idx_emp_manager` optimizes recursive join on `manager_id`; INNER JOINs reduce cardinality at each recursion level | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | Explicit `access_level >= 2` filter enforces role-based access control; filters out low-privilege roles and inactive employees; avoids selecting unmapped PII-adjacent fields (`dept_id`, hire dates); parameterizable for multi-tenant isolation | ✓ Guideline 4 (Security & Data Privacy) |
-| **Recursion Safety** | Hard limit of 5 levels (`hierarchy_level < 5`) prevents infinite loops in circular manager references; NULL `manager_id` naturally terminates recursion | ✓ Production stability |
-| **Result</pre></td>
-                <td class="score-col"><span class="score score-low">3</span></td>
-                <td class="reasoning">The solution demonstrates strong understanding of recursive CTEs and security filtering, but fails a mandatory requirement by omitting the dept_id column that is explicitly listed in the Mapping section. The Mapping clearly states 'employees.dept_id (Physical: dept_id, Logical: Department ID, Type: INT, Required: Yes)' - this is a required field that must be selected. Additionally, the ORDER BY includes hierarchy_level which is not in the final SELECT, violating the strict ORDER BY compliance guideline. The recursive logic also has a semantic flaw where the emp_id column gets overwritten with manager information during recursion, making the output ambiguous. These are fundamental violations of the mandatory requirements.</td>
+                <td>Testing with a passage in a non-English language (translated scholarly text) to test language adaptability</td>
+                <td class="prompt-inputs"><strong>content:</strong> La neuroplasticité cérébrale représente la capacité du cerveau à se réorganiser en formant de nouvelles connexions neuronales tout au long de la vie. Des études récentes utilisant l'imagerie par résonance magnétique fonctionnelle ont démontré que l'apprentissage de nouvelles compétences linguistiques active des régions corticales spécifiques, particulièrement le gyrus de Broca et l'aire de Wernicke. De plus, la réhabilitation post-accident vasculaire cérébral bénéficie de cette plasticité, permettant aux patients de récupérer partiellement les fonctions motrices et cognitives grâce à la neurogenèse dans l'hippocampe et la réorganisation des circuits neuronaux adjacents aux zones lésées.</td>
+                <td class="criteria">• Extracts all major topics from the translated French scholarly passage into a JSON array<br>• Identifies key concepts including neuroplasticity, brain imaging techniques, language learning, and post-stroke rehabilitation<br>• Returns a valid JSON array format with string elements</td>
+                <td class="output"><pre>```json
+[
+  "neuroplasticité cérébrale",
+  "réorganisation cérébrale",
+  "connexions neuronales",
+  "imagerie par résonance magnétique fonctionnelle",
+  "apprentissage linguistique",
+  "régions corticales",
+  "gyrus de Broca",
+  "aire de Wernicke",
+  "réhabilitation post-accident vasculaire cérébral",
+  "fonctions motrices",
+  "fonctions cognitives",
+  "neurogenèse",
+  "hippocampe",
+  "circuits neuronaux"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-high">9</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: it is a valid JSON array containing only strings with topics, no extra commentary, and nothing else in the response. It successfully identifies all major topics from the French scholarly passage including neuroplasticity, brain imaging techniques (fMRI), language learning, specific brain regions, and post-stroke rehabilitation. The extraction is comprehensive and accurate. Minor redundancy exists between related concepts, but this does not violate any stated criteria and represents reasonable topic extraction from a passage where concepts naturally overlap.</td>
             </tr>
         
             <tr>
-                <td>Testing with a social media platform requiring graph-like relationships between users, posts, and comments</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract user engagement data from a social media platform's base tables. Source tables: users (user profiles), posts (user-created content), comments (replies to posts), and follows (user-to-user relationships). Extraction condition: Include all active users with their posts and associated comments created in the last 90 days, maintaining the hierarchical relationship between users, posts, and comments.<br><strong>Table Schema:</strong> CREATE TABLE users (user_id INT PRIMARY KEY, username VARCHAR(100) NOT NULL, email VARCHAR(100) UNIQUE, created_date TIMESTAMP, is_active BOOLEAN DEFAULT TRUE); CREATE TABLE posts (post_id INT PRIMARY KEY, user_id INT NOT NULL, content TEXT, created_date TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(user_id)); CREATE TABLE comments (comment_id INT PRIMARY KEY, post_id INT NOT NULL, user_id INT NOT NULL, content TEXT, created_date TIMESTAMP, FOREIGN KEY (post_id) REFERENCES posts(post_id), FOREIGN KEY (user_id) REFERENCES users(user_id)); CREATE TABLE follows (follow_id INT PRIMARY KEY, follower_id INT NOT NULL, following_id INT NOT NULL, created_date TIMESTAMP, FOREIGN KEY (follower_id) REFERENCES users(user_id), FOREIGN KEY (following_id) REFERENCES users(user_id));<br><strong>Mapping:</strong> users: user_id (physical: user_id, logical: User Identifier, type: INT, required: YES), username (physical: username, logical: User Name, type: VARCHAR(100), required: YES); posts: post_id (physical: post_id, logical: Post Identifier, type: INT, required: YES), user_id (physical: user_id, logical: Post Author ID, type: INT, required: YES), content (physical: content, logical: Post Content, type: TEXT, required: YES), created_date (physical: created_date, logical: Post Creation Date, type: TIMESTAMP, required: YES, rule: Filter >= CURRENT_DATE - 90 days); comments: comment_id (physical: comment_id, logical: Comment Identifier, type: INT, required: YES), post_id (physical: post_id, logical: Referenced Post ID, type: INT, required: YES), user_id (physical: user_id, logical: Comment Author ID, type: INT, required: YES), created_date (physical: created_date, logical: Comment Creation Date, type: TIMESTAMP, required: YES, rule: Filter >= CURRENT_DATE - 90 days); follows: follower_id (physical: follower_id, logical: Follower User ID, type: INT, required: YES), following_id (physical: following_id, logical: Followed User ID, type: INT, required: YES).</td>
-                <td class="criteria">• SQL correctly joins users, posts, and comments maintaining hierarchical relationships with proper foreign keys<br>• Filters include only active users and data from the last 90 days as specified<br>• All required columns from mapping are included with correct data types and logical naming</td>
-                <td class="output"><pre># SQL Extract Query for User Engagement Data
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    u.user_id,
-    u.username,
-    p.post_id,
-    p.user_id AS post_author_id,
-    p.content AS post_content,
-    p.created_date AS post_created_date,
-    c.comment_id,
-    c.post_id AS comment_post_id,
-    c.user_id AS comment_author_id,
-    c.content AS comment_content,
-    c.created_date AS comment_created_date,
-    f.follower_id,
-    f.following_id
-FROM
-    users u
-    LEFT JOIN posts p ON u.user_id = p.user_id
-        AND p.created_date >= CURRENT_DATE - INTERVAL '90 days'
-    LEFT JOIN comments c ON p.post_id = c.post_id
-        AND c.created_date >= CURRENT_DATE - INTERVAL '90 days'
-    LEFT JOIN follows f ON u.user_id = f.follower_id
-        OR u.user_id = f.following_id
-WHERE
-    u.is_active = TRUE
-ORDER BY
-    u.user_id ASC,
-    p.created_date DESC NULLS LAST,
-    c.created_date DESC NULLS LAST,
-    c.comment_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly 13 mapped columns selected across all tables (user_id, username, post_id, post_author_id, post_content, post_created_date, comment_id, comment_post_id, comment_author_id, comment_content, comment_created_date, follower_id, following_id); no unmapped columns included | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Join Strategy** | LEFT JOINs preserve hierarchical relationships: active users remain visible even without posts/comments/follows; maintains referential integrity through explicit FK relationships | ✓ Data integrity & business requirement |
-| **Filtering Conditions** | `u.is_active = TRUE` ensures only active users included; `p.created_date >= CURRENT_DATE - INTERVAL '90 days'` and `c.created_date >= CURRENT_DATE - INTERVAL '90 days'` applied in ON clauses to filter related records while preserving user rows with no recent activity | ✓ Mapping transfer rules |
-| **Grouping** | No GROUP BY clause (detail-level extraction preserving hierarchical relationships, not aggregation) | ✓ Guideline 2 |
-| **ORDER BY** | All columns referenced (user_id, post_created_date, comment_created_date, comment_id) exist in the SELECT clause and mapping; NULLS LAST handles users without recent posts/comments | ✓ Guideline 3 |
-| **Performance Impact** | Leverages indexes on `users.is_active`, `posts.user_id` and `posts.created_date`, `comments.post_id` and `comments.created_date`, and `follows.follower_id`/`following_id` to optimize filtering and join operations; LEFT JOINs may impact performance on large datasets—consider materialized views or staged extraction for >10M active users | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | Email field (`users.email`) explicitly excluded from mapping—correctly omitted to prevent unnecessary PII exposure; extraction scoped to active users only; parameterization of the 90-day interval recommended for production implementation to prevent SQL injection | ✓ Guideline 4 (Security) |
-| **Result Type** | Granular detail records maintaining user-post-comment hierarchy (multiple rows per user if multiple posts/comments exist); follows relationship included for complete engagement context | ✓ Business requirement |
-
----
-
-## Production Design Considerations
-
-### Performance Recommendations:
-1. **Indexing Strategy**: Ensure composite indexes on `(user_id, created_date)` for posts and comments tables to accelerate filtered</pre></td>
-                <td class="score-col"><span class="score score-low">3</span></td>
-                <td class="reasoning">The solution fails a mandatory requirement by omitting the 'email' column from the SELECT clause despite it being explicitly listed in the Mapping section. Additionally, the follows table join uses OR logic that fundamentally breaks the hierarchical relationship preservation - it causes row multiplication and data duplication rather than maintaining clean user-post-comment hierarchy. The query would return incorrect result sets with duplicate user records for each follow relationship. While the core concept of using LEFT JOINs and the 90-day filtering logic are sound, these critical defects in column selection and join logic violate the mandatory requirements for 'All required columns from mapping are included' and 'SQL correctly joins tables maintaining hierarchical relationships.'</td>
-            </tr>
-        
-            <tr>
-                <td>Testing with an inventory management system requiring stock tracking across multiple warehouses with constraints</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract inventory transaction details from a multi-warehouse stock management system. Source tables: WAREHOUSE (warehouse locations), INVENTORY (current stock levels), STOCK_MOVEMENT (transaction history). Condition: Include all stock movements in the last 30 days where warehouse capacity utilization exceeds 75% or stock quantity falls below minimum threshold.<br><strong>Table Schema:</strong> WAREHOUSE: warehouse_id (PK, INT), warehouse_name (VARCHAR 100), location (VARCHAR 100), capacity (INT), active_flag (CHAR 1). INVENTORY: inventory_id (PK, INT), warehouse_id (FK, INT), product_id (INT), current_qty (INT), min_threshold (INT), max_capacity (INT), last_updated (DATETIME). STOCK_MOVEMENT: movement_id (PK, INT), inventory_id (FK, INT), movement_type (VARCHAR 20: IN/OUT), qty_moved (INT), movement_date (DATE), reference_id (VARCHAR 50).<br><strong>Mapping:</strong> WAREHOUSE.warehouse_id → Physical: warehouse_id, Logical: Warehouse Identifier, Type: INT, Required: Yes. INVENTORY.current_qty → Physical: current_qty, Logical: Current Stock Quantity, Type: INT, Rule: Calculate utilization_pct = (current_qty/max_capacity)*100, Required: Yes. STOCK_MOVEMENT.movement_date → Physical: movement_date, Logical: Transaction Date, Type: DATE, Rule: Filter WHERE movement_date >= DATEADD(day, -30, GETDATE()), Required: Yes. STOCK_MOVEMENT.movement_type → Physical: movement_type, Logical: Transaction Type, Type: VARCHAR 20, Required: Yes.</td>
-                <td class="criteria">• SQL correctly joins WAREHOUSE, INVENTORY, and STOCK_MOVEMENT tables with proper foreign key relationships<br>• Filtering logic accurately applies both conditions: (utilization_pct > 75% OR current_qty < min_threshold) AND movement_date within last 30 days<br>• Output includes all mapped columns with correct data types and aliases matching logical names<br>• Query handles NULL values and active_flag constraint appropriately</td>
-                <td class="output"><pre># SQL Extract Query for Inventory Transaction Details
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    w.warehouse_id,
-    i.current_qty,
-    CAST((i.current_qty * 100.0 / i.max_capacity) AS DECIMAL(5, 2)) AS utilization_pct,
-    sm.movement_date,
-    sm.movement_type
-FROM
-    STOCK_MOVEMENT sm
-    INNER JOIN INVENTORY i ON sm.inventory_id = i.inventory_id
-    INNER JOIN WAREHOUSE w ON i.warehouse_id = w.warehouse_id
-WHERE
-    sm.movement_date >= DATEADD(day, -30, GETDATE())
-    AND w.active_flag = 'Y'
-    AND (
-        (i.current_qty * 100.0 / i.max_capacity) > 75
-        OR i.current_qty < i.min_threshold
-    )
-ORDER BY
-    sm.movement_date DESC,
-    w.warehouse_id ASC,
-    sm.movement_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly 5 mapped columns selected: `warehouse_id`, `current_qty`, computed `utilization_pct`, `movement_date`, `movement_type`. No unmapped columns (e.g., `warehouse_name`, `location`, `product_id`, `reference_id`, `qty_moved`) included. | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Utilization Calculation** | `utilization_pct = (current_qty / max_capacity) * 100` applied as derived column per mapping rule; ensures consistent metric definition across all results. | ✓ Mapping specification |
-| **Join Strategy** | INNER JOINs enforce referential integrity: STOCK_MOVEMENT → INVENTORY → WAREHOUSE. Guarantees only valid, linked warehouse and inventory records are extracted. | ✓ Data integrity & referential consistency |
-| **Filtering Logic** | Three-part WHERE clause: (1) `movement_date >= DATEADD(day, -30, GETDATE())` enforces 30-day transaction window, (2) `active_flag = 'Y'` ensures only active warehouses, (3) Compound condition `(utilization_pct > 75 OR current_qty < min_threshold)` applies both business rules. | ✓ Mapping transfer rules |
-| **Grouping** | No GROUP BY clause applied; extraction returns detail-level (granular) records, one row per stock movement transaction. | ✓ Guideline 2 (No unnecessary aggregation) |
-| **ORDER BY** | All referenced columns (`movement_date`, `warehouse_id`, `movement_id`) exist in SELECT clause or are indexed table columns; maintains deterministic output order. | ✓ Guideline 3 (Strict ORDER BY Compliance) |
-| **Performance Impact** | **Index utilization**: Filters leverage indexed columns: `STOCK_MOVEMENT.movement_date` (date range scan), `INVENTORY.warehouse_id` and `WAREHOUSE.warehouse_id` (FK join optimization). **Volume handling**: DATEADD filter reduces dataset scope before JOIN operations; compound WHERE conditions use indexed columns first. Avoids full table scans on large STOCK_MOVEMENT tables. | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | **Data minimization**: Only required attributes selected per mapping; sensitive fields (e.g., warehouse location, reference_id) excluded unless mapped. **Access control**: Query filters to `active_flag = 'Y'` enforcing logical data partitioning. **Safe parameterization**: Date filter uses DATEADD function (platform-native, injection-safe); no string concatenation. No PII fields (names, locations) in output. | ✓ Guideline 4 (Security & Privacy) |
-| **Result Type** | Granular transaction-level extract; one row per stock movement event meeting criteria, enabling audit trail analysis and inventory health monitoring. | ✓ Business requirement |
-
----
-
-## Production Design</pre></td>
-                <td class="score-col"><span class="score score-low">5</span></td>
-                <td class="reasoning">The solution meets most mandatory requirements: correct JOINs, accurate filtering logic, and all mapped columns are selected with proper types. However, there is a critical violation of the mandatory 'Order by are all correct' requirement - the ORDER BY clause includes 'movement_id' which is not in the SELECT clause. This violates strict ORDER BY compliance standards. Additionally, the utilization_pct calculation lacks NULL/zero-division safeguards, which could cause runtime errors in production. The active_flag filter is applied but lacks defensive programming for edge cases. These issues prevent a score above 6, as they represent violations of mandatory requirements and production-readiness concerns.</td>
-            </tr>
-        
-            <tr>
-                <td>Testing with a document management system requiring versioning, metadata indexing, and full-text search capabilities</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract document versioning and metadata records from a document management system. Source tables: documents (base records), document_versions (version history), document_metadata (indexed attributes), and fulltext_index (search content). Extraction condition: All active documents with their latest version and complete metadata, excluding archived records marked with status='ARCHIVED'.<br><strong>Table Schema:</strong> CREATE TABLE documents (doc_id INT PRIMARY KEY, doc_name VARCHAR(255) NOT NULL, status VARCHAR(20), created_date TIMESTAMP, modified_date TIMESTAMP); CREATE TABLE document_versions (version_id INT PRIMARY KEY, doc_id INT FOREIGN KEY, version_number INT, content_hash VARCHAR(64), created_by VARCHAR(100), created_date TIMESTAMP); CREATE TABLE document_metadata (metadata_id INT PRIMARY KEY, doc_id INT FOREIGN KEY, meta_key VARCHAR(100), meta_value VARCHAR(500), indexed BOOLEAN); CREATE TABLE fulltext_index (index_id INT PRIMARY KEY, doc_id INT FOREIGN KEY, version_id INT FOREIGN KEY, searchable_text TEXT, last_indexed TIMESTAMP);<br><strong>Mapping:</strong> documents: doc_id (physical/logical, INT, PK), doc_name (physical/logical, VARCHAR(255), required), status (physical/logical, VARCHAR(20), filter rule: exclude ARCHIVED). document_versions: version_id (INT, PK), doc_id (INT, FK, required), version_number (INT, required), created_date (TIMESTAMP, required). document_metadata: metadata_id (INT, PK), doc_id (INT, FK), meta_key (VARCHAR(100), required for indexed=true), meta_value (VARCHAR(500), required). fulltext_index: index_id (INT, PK), doc_id (INT, FK), searchable_text (TEXT, required for search capability), last_indexed (TIMESTAMP, required for freshness validation).</td>
-                <td class="criteria">• SQL query correctly joins all four tables with appropriate foreign key relationships to retrieve active documents with their latest versions<br>• Query filters out archived documents and includes only metadata records marked as indexed<br>• Query returns document details, version history, indexed metadata key-value pairs, and searchable text content in a single result set<br>• Query includes proper handling of one-to-many relationships (documents to versions and metadata) without duplication</td>
-                <td class="output"><pre># SQL Extract Query for Document Versioning and Metadata
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
-SELECT
-    d.doc_id,
-    d.doc_name,
-    d.status,
-    dv.version_id,
-    dv.version_number,
-    dv.content_hash,
-    dv.created_by,
-    dv.created_date,
-    dm.metadata_id,
-    dm.meta_key,
-    dm.meta_value,
-    dm.indexed,
-    fi.index_id,
-    fi.searchable_text,
-    fi.last_indexed
-FROM
-    documents d
-    INNER JOIN document_versions dv ON d.doc_id = dv.doc_id
-    LEFT JOIN document_metadata dm ON d.doc_id = dm.doc_id
-    LEFT JOIN fulltext_index fi ON d.doc_id = fi.doc_id AND dv.version_id = fi.version_id
-WHERE
-    d.status != 'ARCHIVED'
-    AND dv.version_id = (
-        SELECT MAX(dv2.version_id)
-        FROM document_versions dv2
-        WHERE dv2.doc_id = d.doc_id
-    )
-ORDER BY
-    d.doc_id ASC,
-    dv.version_id DESC,
-    dm.metadata_id ASC,
-    fi.index_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection** | Exactly 15 mapped columns selected: `doc_id`, `doc_name`, `status` (documents); `version_id`, `version_number`, `content_hash`, `created_by`, `created_date` (document_versions); `metadata_id`, `meta_key`, `meta_value`, `indexed` (document_metadata); `index_id`, `searchable_text`, `last_indexed` (fulltext_index). No unmapped or extra columns included. | ✓ Guideline 1 (Strict Mapping Contract) |
-| **Join Strategy** | INNER JOIN on `document_versions` enforces that only documents with version records are extracted. LEFT JOINs on `document_metadata` and `fulltext_index` preserve documents lacking optional metadata/search indexes without filtering. | ✓ Data integrity & completeness |
-| **Latest Version Selection** | Subquery `MAX(dv2.version_id)` ensures only the latest version per document is included, satisfying the "latest version" requirement without aggregation overhead in main query. | ✓ Business requirement |
-| **Filtering Condition** | `d.status != 'ARCHIVED'` explicitly excludes archived records as specified in the extraction condition. | ✓ Mapping transfer rule |
-| **Grouping** | No GROUP BY clause used (detail-level extraction preserving document-version-metadata granularity, not aggregation). Each row represents a unique document-version-metadata combination. | ✓ Guideline 2 |
-| **ORDER BY** | All referenced columns (`doc_id`, `version_id`, `metadata_id`, `index_id`) exist in the SELECT clause and mapping specification. Ordering ensures consistent, deterministic result sequencing. | ✓ Guideline 3 |
-| **Performance Impact** | Indexes on `documents.doc_id` (PK) and foreign keys (`document_versions.doc_id`, `document_metadata.doc_id`, `fulltext_index.doc_id`) optimize JOIN operations. Correlated subquery on `document_versions` with indexed `version_id` ensures efficient "latest version" filtering. `status != 'ARCHIVED'` leverages potential index on status column. For large datasets (millions of documents), consider materializing the latest version lookup in a CTE or indexed view. | ✓ Guideline 4 (Performance) |
-| **Security & Privacy** | No PII/sensitive data columns beyond those explicitly mapped (e.g., `created_by` retained per mapping specification but NOT expanded to include user emails or audit trails). Metadata extraction respects the `indexed` flag—non-indexed metadata is still extracted but can be selectively</pre></td>
-                <td class="score-col"><span class="score score-low">3</span></td>
-                <td class="reasoning">The solution violates two mandatory requirements: (1) The WHERE clause fails to filter metadata to indexed=true records only, directly contradicting the explicit criteria requirement. (2) The query architecture does not prevent duplication in one-to-many relationships—LEFT JOINs on both document_metadata and fulltext_index without aggregation or row_number windowing will produce Cartesian products. While the solution demonstrates good understanding of joins and latest version logic, these are fundamental failures in meeting the stated criteria. The solution would need either a WHERE dm.indexed = true clause and a CTE/window function approach to handle the many-to-many relationships properly.</td>
-            </tr>
-        
-            <tr>
-                <td>Testing with a reporting system requiring materialized views, computed columns, and data warehouse staging tables</td>
-                <td class="prompt-inputs"><strong>Overview:</strong> Extract data from operational source tables (SALES_TRANSACTIONS, CUSTOMER_MASTER, PRODUCT_CATALOG) into a data warehouse staging layer. Source system uses transactional schema; target requires dimensional modeling with slowly changing dimensions (SCD Type 2) for CUSTOMER and PRODUCT. Extraction condition: all transactions from last 30 days, active customers only, products with sales > 0. Materialized views required for daily aggregations and computed columns for derived metrics (profit margin, customer lifetime value).<br><strong>Table Schema:</strong> SOURCE - SALES_TRANSACTIONS (transaction_id PK, customer_id FK, product_id FK, sale_date DATE, quantity INT, unit_price DECIMAL(10,2), total_amount DECIMAL(12,2)). CUSTOMER_MASTER (customer_id PK, name VARCHAR(100), country VARCHAR(50), active_flag CHAR(1), created_date DATE). PRODUCT_CATALOG (product_id PK, product_name VARCHAR(100), category VARCHAR(50), cost_price DECIMAL(10,2), list_price DECIMAL(10,2)). TARGET - DIM_CUSTOMER_STG (customer_key PK, customer_id, customer_name, country, effective_date, end_date, is_current, row_hash), FACT_SALES_STG (sales_key PK, customer_key FK, product_key FK, transaction_date, quantity, unit_price, total_amount, profit_amount, margin_percent).<br><strong>Mapping:</strong> SALES_TRANSACTIONS.transaction_id → FACT_SALES_STG.sales_key (Identity); SALES_TRANSACTIONS.customer_id + CUSTOMER_MASTER.customer_id → DIM_CUSTOMER_STG.customer_id (VARCHAR, required, PK match); CUSTOMER_MASTER.name → DIM_CUSTOMER_STG.customer_name (VARCHAR(100), required); PRODUCT_CATALOG.cost_price, SALES_TRANSACTIONS.unit_price → FACT_SALES_STG.profit_amount (DECIMAL, computed: unit_price - cost_price × quantity); SALES_TRANSACTIONS.total_amount, profit_amount → FACT_SALES_STG.margin_percent (DECIMAL, computed: (profit_amount / total_amount) × 100, 2 decimals); Filter: CUSTOMER_MASTER.active_flag = 'Y' AND sale_date >= DATEADD(day, -30, GETDATE()); SCD Type 2: Track customer changes via row_hash comparison, set end_date and is_current flag.</td>
-                <td class="criteria">• SQL includes materialized view creation for daily sales aggregations and computed columns for profit_amount and margin_percent with correct formulas<br>• SCD Type 2 logic correctly implemented with effective_date, end_date, is_current flag, and row_hash for change detection<br>• Staging tables properly structured with surrogate keys, foreign key relationships, and all required columns from mapping specification<br>• Extraction filter applies 30-day window and active customer condition with appropriate WHERE clause and JOIN logic</td>
-                <td class="output"><pre># SQL Extract Query for Data Warehouse Staging Layer
-
-Based on the Base Design Requirement and guidelines provided, here is the detail design SQL extract query:
-
-```sql
--- FACT_SALES_STG Extract Query with SCD Type 2 Customer Dimension
-WITH customer_hash AS (
-    -- Generate row hash for SCD Type 2 change detection
-    SELECT
-        c.customer_id,
-        c.name AS customer_name,
-        c.country,
-        c.active_flag,
-        HASHBYTES('SHA2_256', 
-            CONCAT(c.name, '|', c.country)) AS row_hash
-    FROM
-        CUSTOMER_MASTER c
-    WHERE
-        c.active_flag = 'Y'
-),
-sales_with_product AS (
-    -- Join sales transactions with product cost data
-    SELECT
-        st.transaction_id,
-        st.customer_id,
-        st.product_id,
-        st.sale_date,
-        st.quantity,
-        st.unit_price,
-        st.total_amount,
-        pc.cost_price
-    FROM
-        SALES_TRANSACTIONS st
-        INNER JOIN PRODUCT_CATALOG pc ON st.product_id = pc.product_id
-    WHERE
-        st.sale_date >= DATEADD(day, -30, CAST(GETDATE() AS DATE))
-        AND st.quantity > 0
-)
--- Main FACT_SALES_STG Extract
-SELECT
-    swp.transaction_id AS sales_key,
-    ch.customer_id,
-    swp.product_id,
-    swp.sale_date AS transaction_date,
-    swp.quantity,
-    swp.unit_price,
-    swp.total_amount,
-    CAST((swp.unit_price - swp.cost_price) * swp.quantity AS DECIMAL(12,2)) AS profit_amount,
-    CAST(
-        CASE 
-            WHEN swp.total_amount = 0 THEN 0
-            ELSE (((swp.unit_price - swp.cost_price) * swp.quantity) / swp.total_amount) * 100
-        END
-        AS DECIMAL(10,2)
-    ) AS margin_percent,
-    ch.row_hash
-FROM
-    sales_with_product swp
-    INNER JOIN customer_hash ch ON swp.customer_id = ch.customer_id
-ORDER BY
-    swp.sale_date DESC,
-    swp.transaction_id ASC;
-
--- DIM_CUSTOMER_STG Extract Query (SCD Type 2 Implementation)
-WITH customer_hash AS (
-    SELECT
-        c.customer_id,
-        c.name AS customer_name,
-        c.country,
-        c.active_flag,
-        HASHBYTES('SHA2_256', 
-            CONCAT(c.name, '|', c.country)) AS row_hash
-    FROM
-        CUSTOMER_MASTER c
-    WHERE
-        c.active_flag = 'Y'
-)
-SELECT
-    ROW_NUMBER() OVER (PARTITION BY ch.customer_id ORDER BY ch.customer_id) AS customer_key,
-    ch.customer_id,
-    ch.customer_name,
-    ch.country,
-    CAST(GETDATE() AS DATE) AS effective_date,
-    NULL AS end_date,
-    CAST(1 AS BIT) AS is_current,
-    ch.row_hash
-FROM
-    customer_hash ch
-ORDER BY
-    ch.customer_id ASC;
-```
-
-## Query Design Rationale
-
-| Aspect | Implementation | Compliance |
-|--------|----------------|-----------|
-| **Column Selection (FACT_SALES_STG)** | Exactly 9 mapped columns selected: `sales_key`, `customer_id`, `product_id`, `transaction_date`, `quantity`, `unit_price`, `total_amount`, `profit_amount`, `margin_percent`, plus `row_hash` for SCD tracking. No unmapped columns (e.g., `is_active`, `created_date`, extra product attributes) included. | ✓ **Guideline 1** (Strict Mapping Contract</pre></td>
-                <td class="score-col"><span class="score score-low">3</span></td>
-                <td class="reasoning">The solution demonstrates understanding of core SQL concepts (CTEs, computed columns, filtering) and correctly implements formulas for profit_amount and margin_percent. However, it fails multiple MANDATORY requirements: (1) No materialized views created despite explicit requirement, (2) Surrogate key generation is fundamentally broken using ROW_NUMBER() with PARTITION BY customer_id, (3) Missing product_key in fact table breaks FK relationships, (4) SCD Type 2 is incomplete - only generates current records without change detection logic or historical record handling, (5) No PRODUCT dimension staging table provided. The solution reads as a partial SELECT query rather than a complete detail design with view creation, proper dimensional modeling, and full SCD Type 2 implementation.</td>
+                <td>Testing with a passage containing negations and contrasts (e.g., 'unlike previous studies on X, we focus on Y') to verify contextual understanding</td>
+                <td class="prompt-inputs"><strong>content:</strong> Unlike previous studies on machine learning that emphasize algorithmic complexity and computational efficiency, this research prioritizes interpretability and fairness in decision-making systems. While traditional approaches focus on maximizing predictive accuracy, we argue that transparency mechanisms and bias mitigation strategies are equally critical for real-world deployment. Our framework contrasts with prior work by integrating explainable AI techniques alongside robust statistical validation, rather than treating these as separate concerns. Previous literature on neural networks has largely ignored the societal implications of automated decision systems, yet our findings demonstrate that accountability measures substantially improve user trust without sacrificing model performance.</td>
+                <td class="criteria">• Extracts primary topics (interpretability, fairness, explainable AI, bias mitigation, accountability) rather than contrasted topics (algorithmic complexity, computational efficiency, predictive accuracy)<br>• Returns results as a valid JSON array of strings<br>• Demonstrates understanding that negations and contrasts indicate what the work focuses on, not what it dismisses</td>
+                <td class="output"><pre>```json
+[
+  "machine learning",
+  "algorithmic complexity",
+  "computational efficiency",
+  "interpretability",
+  "fairness",
+  "decision-making systems",
+  "predictive accuracy",
+  "transparency mechanisms",
+  "bias mitigation",
+  "explainable AI",
+  "statistical validation",
+  "neural networks",
+  "automated decision systems",
+  "accountability measures",
+  "user trust",
+  "model performance"
+]
+```</pre></td>
+                <td class="score-col"><span class="score score-low">4</span></td>
+                <td class="reasoning">The solution meets all mandatory requirements: it is a valid JSON array of strings with topics and no extra commentary. However, it significantly fails the secondary criteria by including topics that the passage explicitly contrasts against or dismisses. The task criteria specifically state the solution should 'extract primary topics...rather than contrasted topics' and demonstrate understanding that 'negations and contrasts indicate what the work focuses on, not what it dismisses.' The inclusion of 'algorithmic complexity,' 'computational efficiency,' and 'predictive accuracy' directly contradicts this requirement, as the passage uses these as foils to highlight what the research does NOT prioritize. A proper solution should focus on the primary topics: interpretability, fairness, decision-making systems, transparency mechanisms, bias mitigation, explainable AI, statistical validation, automated decision systems, accountability measures, and user trust.</td>
             </tr>
         
             </tbody>

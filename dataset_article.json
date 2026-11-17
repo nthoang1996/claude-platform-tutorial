@@ -1,0 +1,123 @@
+[
+  {
+    "prompt_inputs": {
+      "content": "Recent advances in CRISPR gene editing have demonstrated remarkable efficacy in treating sickle cell disease, with clinical trials showing sustained remission in 95% of patients. The technique works by precisely targeting and correcting the mutated beta-globin gene responsible for the condition."
+    },
+    "solution_criteria": [
+      "Extracts all major topics present in the passage",
+      "Returns output as a valid JSON array of strings",
+      "Handles minimal context without missing relevant topics"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a very short passage (2-3 sentences) to verify the prompt handles minimal context appropriately"
+  },
+  {
+    "prompt_inputs": {
+      "content": "This study examines the intersection of machine learning and natural language processing in biomedical text mining. We employ deep neural networks, specifically transformer-based architectures, to extract clinical entities from electronic health records. Our approach addresses challenges in named entity recognition by leveraging transfer learning and pre-trained language models. The machine learning pipeline integrates natural language processing techniques for tokenization and semantic analysis, demonstrating that deep learning methods outperform traditional machine learning approaches in biomedical information extraction tasks. We validate our neural network model on clinical datasets containing medical terminology and disease mentions."
+    },
+    "solution_criteria": [
+      "All distinct topics are extracted without duplication",
+      "Overlapping topics (e.g., machine learning, deep learning, neural networks) are correctly separated as distinct entries",
+      "Output is a valid JSON array of strings"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a passage containing multiple overlapping topics to verify accurate topic separation and deduplication"
+  },
+  {
+    "prompt_inputs": {
+      "content": "Recent advances in neuroplasticity research have demonstrated that cognitive rehabilitation following traumatic brain injury can be significantly enhanced through targeted motor learning protocols. Patients engaged in constraint-induced movement therapy showed marked improvements in neural reorganization, with functional MRI studies revealing compensatory activation in contralesional hemispheres. These findings parallel observations in stroke recovery literature, where intensive task-specific training combined with pharmacological interventions has yielded superior outcomes compared to conventional physical therapy alone. The mechanisms underlying these improvements suggest that activity-dependent synaptic strengthening, mediated through BDNF signaling pathways, facilitates the formation of novel neural circuits that circumvent damaged tissue."
+    },
+    "solution_criteria": [
+      "Extracts both explicit topics (neuroplasticity, traumatic brain injury, constraint-induced movement therapy) and implicit main subjects (neural recovery, rehabilitation, brain plasticity mechanisms)",
+      "Returns output as a JSON array of strings",
+      "Distinguishes between specific techniques/interventions and broader conceptual domains they belong to"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a passage containing implicit topics (not explicitly named) to verify if the prompt infers main subjects vs literal extraction"
+  },
+  {
+    "prompt_inputs": {
+      "content": "The gig economy has fundamentally altered labor market dynamics, creating both opportunities and vulnerabilities for workers across income levels. From an economic perspective, platform-based work reduces transaction costs and increases market efficiency by matching supply and demand in real-time, yet sociological research reveals persistent inequality patterns wherein minority workers face algorithmic discrimination in task allocation. Policy interventions in several jurisdictions have attempted to reclassify gig workers as employees entitled to benefits, raising concerns among economists about reduced labor market flexibility and platform viability. Simultaneously, sociologists document the erosion of traditional workplace community and social safety nets, while policymakers grapple with regulatory frameworks that balance worker protections against innovation incentives in this rapidly expanding sector."
+    },
+    "solution_criteria": [
+      "Extracts topics spanning all three domains: sociology, economics, and policy",
+      "Identifies specific phenomena mentioned (e.g., algorithmic discrimination, labor market efficiency, worker reclassification)",
+      "Returns output as a JSON array of strings with no extraneous information"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with an interdisciplinary passage that spans sociology, economics, and policy to verify cross-domain topic extraction"
+  },
+  {
+    "prompt_inputs": {
+      "content": "We present a novel approach to quantum entanglement detection using weak continuous measurement and post-selection techniques in superconducting qubit arrays. Our method leverages the non-demolition properties of dispersive readout to implement a Bell inequality test without full quantum state tomography. We demonstrate violation of the CHSH inequality by 2.8 standard deviations using a 5-qubit processor with T1 coherence times exceeding 50 microseconds. The protocol utilizes parametric amplification and heterodyne detection to achieve single-shot fidelity of 96.3%, substantially improving upon previous implementations based on projective measurements. Our results validate the robustness of entanglement in the presence of environmental decoherence and establish a practical framework for scalable certification of multipartite correlations in NISQ-era quantum processors."
+    },
+    "solution_criteria": [
+      "Extracts all major technical topics and concepts (e.g., quantum entanglement, weak measurement, superconducting qubits, Bell inequality, CHSH inequality, decoherence)",
+      "Includes discipline-specific acronyms and jargon as distinct topics (e.g., CHSH, NISQ, T1, non-demolition)",
+      "Returns output as a JSON array of strings",
+      "Avoids extracting generic words or phrases that are not substantive topics"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a highly technical abstract from a physics paper with discipline-specific jargon and acronyms"
+  },
+  {
+    "prompt_inputs": {
+      "content": "Recent advances in machine learning have demonstrated significant improvements in natural language processing tasks. As noted by Smith et al. (2022) and Johnson (2021), transformer-based architectures have revolutionized sentiment analysis, achieving 94% accuracy on benchmark datasets. Furthermore, the application of attention mechanisms, originally proposed by Vaswani et al. (2017), has enabled models to capture long-range dependencies in text. Transfer learning approaches, discussed extensively in Brown et al. (2020), allow pre-trained models to be fine-tuned for domain-specific applications such as biomedical text mining and legal document classification. The computational efficiency of these methods has been improved through quantization techniques (Lee & Park, 2023), reducing model size by up to 75% without significant performance degradation. These developments have practical implications for real-time processing systems and edge computing environments."
+    },
+    "solution_criteria": [
+      "Extracted topics focus on actual content concepts, not citations or author names",
+      "All major topics are captured: machine learning, natural language processing, transformer architectures, sentiment analysis, attention mechanisms, transfer learning, domain-specific applications, and quantization techniques",
+      "Output is a valid JSON array of strings"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a passage heavy in citations and references to verify topics are extracted from actual content, not metadata"
+  },
+  {
+    "prompt_inputs": {
+      "content": "The concept of the sublime in eighteenth-century aesthetic philosophy emerged as a response to Enlightenment rationalism, challenging the primacy of beauty as the sole category of artistic appreciation. Edmund Burke's distinction between the beautiful and the sublime\u2014wherein the sublime evokes terror and vastness while beauty produces harmony and proportion\u2014fundamentally altered critical discourse. This theoretical framework subsequently influenced Romantic literature and visual arts, particularly in depictions of untamed nature and Gothic architecture. Philosophers including Kant further developed these ideas, arguing that the sublime represents an encounter with the limits of human comprehension, thereby establishing connections between aesthetics, epistemology, and the emerging concept of the autonomous subject in modern thought."
+    },
+    "solution_criteria": [
+      "JSON array format with string elements representing distinct topics",
+      "Captures key concepts across philosophical tradition, aesthetic theory, and historical periods mentioned",
+      "Demonstrates domain neutrality by successfully extracting topics from humanities scholarship"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a passage from humanities research (literature, history, philosophy) versus STEM to verify domain neutrality"
+  },
+  {
+    "prompt_inputs": {
+      "content": "Unlike previous studies on machine learning that emphasize algorithmic complexity and computational efficiency, this research prioritizes interpretability and fairness in decision-making systems. While traditional approaches focus on maximizing predictive accuracy, we argue that transparency mechanisms and bias mitigation strategies are equally critical for real-world deployment. Our framework contrasts with prior work by integrating explainable AI techniques alongside robust statistical validation, rather than treating these as separate concerns. Previous literature on neural networks has largely ignored the societal implications of automated decision systems, yet our findings demonstrate that accountability measures substantially improve user trust without sacrificing model performance."
+    },
+    "solution_criteria": [
+      "Extracts primary topics (interpretability, fairness, explainable AI, bias mitigation, accountability) rather than contrasted topics (algorithmic complexity, computational efficiency, predictive accuracy)",
+      "Returns results as a valid JSON array of strings",
+      "Demonstrates understanding that negations and contrasts indicate what the work focuses on, not what it dismisses"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a passage containing negations and contrasts (e.g., 'unlike previous studies on X, we focus on Y') to verify contextual understanding"
+  },
+  {
+    "prompt_inputs": {
+      "content": "La neuroplasticit\u00e9 c\u00e9r\u00e9brale repr\u00e9sente la capacit\u00e9 du cerveau \u00e0 se r\u00e9organiser en formant de nouvelles connexions neuronales tout au long de la vie. Des \u00e9tudes r\u00e9centes utilisant l'imagerie par r\u00e9sonance magn\u00e9tique fonctionnelle ont d\u00e9montr\u00e9 que l'apprentissage de nouvelles comp\u00e9tences linguistiques active des r\u00e9gions corticales sp\u00e9cifiques, particuli\u00e8rement le gyrus de Broca et l'aire de Wernicke. De plus, la r\u00e9habilitation post-accident vasculaire c\u00e9r\u00e9bral b\u00e9n\u00e9ficie de cette plasticit\u00e9, permettant aux patients de r\u00e9cup\u00e9rer partiellement les fonctions motrices et cognitives gr\u00e2ce \u00e0 la neurogen\u00e8se dans l'hippocampe et la r\u00e9organisation des circuits neuronaux adjacents aux zones l\u00e9s\u00e9es."
+    },
+    "solution_criteria": [
+      "Extracts all major topics from the translated French scholarly passage into a JSON array",
+      "Identifies key concepts including neuroplasticity, brain imaging techniques, language learning, and post-stroke rehabilitation",
+      "Returns a valid JSON array format with string elements"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a passage in a non-English language (translated scholarly text) to test language adaptability"
+  },
+  {
+    "prompt_inputs": {
+      "content": "This study presents a novel statistical model for predicting climate patterns using machine learning algorithms. The theoretical model underlying our approach integrates multiple data sources including satellite imagery, ocean temperature measurements, and atmospheric pressure readings. We validated our predictive model against historical climate data spanning 50 years, achieving 87% accuracy. The conceptual model emphasizes feedback mechanisms between ocean currents and atmospheric circulation, while our computational model employs neural networks with 15 hidden layers. Additionally, we developed a simplified analytical model for interpretability, which approximates the full model's behavior while reducing computational requirements by 60%."
+    },
+    "solution_criteria": [
+      "Correctly disambiguates different uses of 'model' (statistical, theoretical, computational, analytical, predictive, conceptual) and extracts them as distinct topics",
+      "Includes all other substantive topics mentioned (climate patterns, machine learning, satellite imagery, ocean temperature, atmospheric pressure, neural networks)",
+      "Returns output as a valid JSON array of strings with no duplicate entries"
+    ],
+    "task_description": "Extract topics out of a passage of text from a scholarly article into a JSON array of string",
+    "scenario": "Testing with a passage containing ambiguous terms that could represent multiple topics (e.g., 'model' as statistical model vs. theoretical model) to verify disambiguation capability"
+  }
+]
