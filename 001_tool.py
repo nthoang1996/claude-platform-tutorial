@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta 
+from anthropic.types import ToolParam
 
 def get_curent_datetime(date_format="%Y-%m-%d %H:%M:%S"):
     if not date_format:
@@ -6,6 +7,22 @@ def get_curent_datetime(date_format="%Y-%m-%d %H:%M:%S"):
     return datetime.now().strftime(date_format)
 
 # print(get_curent_datetime("%H:%M"))
+
+get_curent_datetime_schema = ToolParam({
+    "name": "get_curent_datetime",
+    "description": "Returns the current local date and time of the system as a formatted string. Use this tool whenever the user asks about the current date, current time, or 'now', or when you need today's date to resolve relative references such as 'today', 'tomorrow', or 'in two hours'. It does not accept a date to convert and cannot return times for other time zones; it only reports the present moment. The output is formatted with Python's strftime format codes. If no format is given, it returns a 24-hour timestamp like '2025-04-03 14:30:00'. The format must be a non-empty string, otherwise the tool raises an error.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "date_format": {
+                "type": "string",
+                "description": "A Python strftime format string that controls how the current datetime is rendered, e.g. '%Y-%m-%d' for '2025-04-03', '%H:%M' for '14:30', or '%A, %B %d, %Y' for 'Thursday, April 03, 2025'. Must not be empty. Defaults to '%Y-%m-%d %H:%M:%S' when omitted.",
+                "default": "%Y-%m-%d %H:%M:%S",
+            }
+        },
+        "required": [],
+    },
+})
 
 def add_duration_to_datetime(
     datetime_str, duration=0, unit="days", input_format="%Y-%m-%d"
