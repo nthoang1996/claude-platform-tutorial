@@ -11,7 +11,7 @@ model = "claude-sonnet-5-5"
 def add_user_message(messages, message):
     user_message = {
         "role": "user",
-        "content": message.content if isinstance(messages, Message) else messages,
+        "content": message.content if isinstance(message, Message) else message,
     }
     messages.append(user_message)
 
@@ -19,7 +19,7 @@ def add_user_message(messages, message):
 def add_assistant_message(messages, message):
     assistant_message = {
         "role": "assistant",
-        "content": message.content if isinstance(messages, Message) else messages,
+        "content": message.content if isinstance(message, Message) else message,
     }
     messages.append(assistant_message)
 

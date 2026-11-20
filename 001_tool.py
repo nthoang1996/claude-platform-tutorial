@@ -1,9 +1,14 @@
+import json
 from datetime import datetime, timedelta
 
-from anthropic import Anthropic
 from anthropic.types import ToolParam
 
-from lesson_001_requests import add_assistant_message, add_user_message
+from lesson_001_requests import (
+    add_assistant_message,
+    add_user_message,
+    chat,
+    text_from_message,
+)
 
 model = "claude-haiku-4-5"
 
@@ -15,25 +20,6 @@ def get_curent_datetime(date_format="%Y-%m-%d %H:%M:%S"):
 
 
 # print(get_curent_datetime("%H:%M"))
-
-
-get_curent_datetime_schema = ToolParam(
-    {
-        "name": "get_curent_datetime",
-        "description": "Returns the current local date and time of the system as a formatted string. Use this tool whenever the user asks about the current date, current time, or 'now', or when you need today's date to resolve relative references such as 'today', 'tomorrow', or 'in two hours'. It does not accept a date to convert and cannot return times for other time zones; it only reports the present moment. The output is formatted with Python's strftime format codes. If no format is given, it returns a 24-hour timestamp like '2025-04-03 14:30:00'. The format must be a non-empty string, otherwise the tool raises an error.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "date_format": {
-                    "type": "string",
-                    "description": "A Python strftime format string that controls how the current datetime is rendered, e.g. '%Y-%m-%d' for '2025-04-03', '%H:%M' for '14:30', or '%A, %B %d, %Y' for 'Thursday, April 03, 2025'. Must not be empty. Defaults to '%Y-%m-%d %H:%M:%S' when omitted.",
-                    "default": "%Y-%m-%d %H:%M:%S",
-                }
-            },
-            "required": [],
-        },
-    }
-)
 
 
 def add_duration_to_datetime(
@@ -86,6 +72,76 @@ def add_duration_to_datetime(
 
 def set_reminder(content, timestamp):
     print(f"----\nSetting the following reminder for {timestamp}:\n{content}\n----")
+
+
+def run_tool(tool_name, tool_input):
+    if tool_name == "get_curent_datetime":
+        return get_curent_datetime(**tool_input)
+    raise ValueError(f"Unknown tool: {tool_name}")
+
+
+def run_tools(message):
+    tool_requests = [block for block in message.content if block.type == "tool_use"]
+    tool_result_blocks = []
+
+    for tool_request in tool_requests:
+        try:
+            tool_output = run_tool(tool_request.name, tool_request.input)
+            tool_result_block = {
+                "type": "tool_result",
+                "tool_use_id": tool_request.id,
+                "content": json.dumps(tool_output),
+                "is_error": False,
+            }
+
+            tool_result_blocks.append(tool_result_block)
+
+        except Exception as e:  # noqa: BLE001
+            tool_result_block = {
+                "type": "tool_result",
+                "tool_use_id": tool_request.id,
+                "content": f"Error: {e}",
+                "is_error": True,
+            }
+
+            tool_result_blocks.append(tool_result_block)
+
+    return tool_result_blocks
+
+
+def run_conversation(messages):
+    while True:
+        response = chat(messages, model=model, tools=[get_curent_datetime_schema])
+
+        add_assistant_message(messages, response)
+        print(text_from_message(response))
+
+        if response.stop_reason != "tool_use":
+            break
+
+        tool_results = run_tools(response)
+        add_user_message(messages, tool_results)
+
+    return messages
+
+
+get_curent_datetime_schema = ToolParam(
+    {
+        "name": "get_curent_datetime",
+        "description": "Returns the current local date and time of the system as a formatted string. Use this tool whenever the user asks about the current date, current time, or 'now', or when you need today's date to resolve relative references such as 'today', 'tomorrow', or 'in two hours'. It does not accept a date to convert and cannot return times for other time zones; it only reports the present moment. The output is formatted with Python's strftime format codes. If no format is given, it returns a 24-hour timestamp like '2025-04-03 14:30:00'. The format must be a non-empty string, otherwise the tool raises an error.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "date_format": {
+                    "type": "string",
+                    "description": "A Python strftime format string that controls how the current datetime is rendered, e.g. '%Y-%m-%d' for '2025-04-03', '%H:%M' for '14:30', or '%A, %B %d, %Y' for 'Thursday, April 03, 2025'. Must not be empty. Defaults to '%Y-%m-%d %H:%M:%S' when omitted.",
+                    "default": "%Y-%m-%d %H:%M:%S",
+                }
+            },
+            "required": [],
+        },
+    }
+)
 
 
 add_duration_to_datetime_schema = {
@@ -165,42 +221,47 @@ batch_tool_schema = {
 
 messages = []
 
-add_user_message(messages, "What the current time in HH:MM:SS format?")
-
-client = Anthropic()
-
-response = client.messages.create(
-    model=model, max_tokens=1000, messages=messages, tools=[get_curent_datetime_schema]
+add_user_message(
+    messages,
+    "What the current time in HH:MM format? Also, what is the current time in SS format?",
 )
 
-print(response)
+run_conversation(messages)
 
-add_assistant_message(messages, response)
+# client = Anthropic()
 
-print(messages)
+# response = client.messages.create(
+#     model=model, max_tokens=1000, messages=messages, tools=[get_curent_datetime_schema]
+# )
 
-tool_use = next(block for block in response.content if block.type == "tool_use")
+# print(response)
 
-result = get_curent_datetime(**tool_use.input)
+# add_assistant_message(messages, response)
 
-messages.append(
-    {
-        "role": "user",
-        "content": [
-            {
-                "type": "tool_result",
-                "tool_use_id": tool_use.id,
-                "content": result,
-                "is_error": False,
-            }
-        ],
-    }
-)
+# print(messages)
 
-print(messages)
+# tool_use = next(block for block in response.content if block.type == "tool_use")
 
-response = client.messages.create(
-    model=model, max_tokens=1000, messages=messages, tools=[get_curent_datetime_schema]
-)
+# result = get_curent_datetime(**tool_use.input)
 
-print(response.content)
+# messages.append(
+#     {
+#         "role": "user",
+#         "content": [
+#             {
+#                 "type": "tool_result",
+#                 "tool_use_id": tool_use.id,
+#                 "content": result,
+#                 "is_error": False,
+#             }
+#         ],
+#     }
+# )
+
+# print(messages)
+
+# response = client.messages.create(
+#     model=model, max_tokens=1000, messages=messages, tools=[get_curent_datetime_schema]
+# )
+
+# print(response.content)
