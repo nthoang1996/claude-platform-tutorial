@@ -1,0 +1,6 @@
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.format]
+# Giữ mỗi phần tử trên một dòng khi có dấu phẩy cuối (mặc định)
+skip-magic-trailing-comma = false

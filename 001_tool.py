@@ -1,28 +1,40 @@
-from datetime import datetime, timedelta 
+from datetime import datetime, timedelta
+
+from anthropic import Anthropic
 from anthropic.types import ToolParam
+
+from lesson_001_requests import add_assistant_message, add_user_message
+
+model = "claude-haiku-4-5"
+
 
 def get_curent_datetime(date_format="%Y-%m-%d %H:%M:%S"):
     if not date_format:
         raise ValueError("date_format can not be empty")
     return datetime.now().strftime(date_format)
 
+
 # print(get_curent_datetime("%H:%M"))
 
-get_curent_datetime_schema = ToolParam({
-    "name": "get_curent_datetime",
-    "description": "Returns the current local date and time of the system as a formatted string. Use this tool whenever the user asks about the current date, current time, or 'now', or when you need today's date to resolve relative references such as 'today', 'tomorrow', or 'in two hours'. It does not accept a date to convert and cannot return times for other time zones; it only reports the present moment. The output is formatted with Python's strftime format codes. If no format is given, it returns a 24-hour timestamp like '2025-04-03 14:30:00'. The format must be a non-empty string, otherwise the tool raises an error.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "date_format": {
-                "type": "string",
-                "description": "A Python strftime format string that controls how the current datetime is rendered, e.g. '%Y-%m-%d' for '2025-04-03', '%H:%M' for '14:30', or '%A, %B %d, %Y' for 'Thursday, April 03, 2025'. Must not be empty. Defaults to '%Y-%m-%d %H:%M:%S' when omitted.",
-                "default": "%Y-%m-%d %H:%M:%S",
-            }
+
+get_curent_datetime_schema = ToolParam(
+    {
+        "name": "get_curent_datetime",
+        "description": "Returns the current local date and time of the system as a formatted string. Use this tool whenever the user asks about the current date, current time, or 'now', or when you need today's date to resolve relative references such as 'today', 'tomorrow', or 'in two hours'. It does not accept a date to convert and cannot return times for other time zones; it only reports the present moment. The output is formatted with Python's strftime format codes. If no format is given, it returns a 24-hour timestamp like '2025-04-03 14:30:00'. The format must be a non-empty string, otherwise the tool raises an error.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "date_format": {
+                    "type": "string",
+                    "description": "A Python strftime format string that controls how the current datetime is rendered, e.g. '%Y-%m-%d' for '2025-04-03', '%H:%M' for '14:30', or '%A, %B %d, %Y' for 'Thursday, April 03, 2025'. Must not be empty. Defaults to '%Y-%m-%d %H:%M:%S' when omitted.",
+                    "default": "%Y-%m-%d %H:%M:%S",
+                }
+            },
+            "required": [],
         },
-        "required": [],
-    },
-})
+    }
+)
+
 
 def add_duration_to_datetime(
     datetime_str, duration=0, unit="days", input_format="%Y-%m-%d"
@@ -150,3 +162,45 @@ batch_tool_schema = {
         "required": ["invocations"],
     },
 }
+
+messages = []
+
+add_user_message(messages, "What the current time in HH:MM:SS format?")
+
+client = Anthropic()
+
+response = client.messages.create(
+    model=model, max_tokens=1000, messages=messages, tools=[get_curent_datetime_schema]
+)
+
+print(response)
+
+add_assistant_message(messages, response)
+
+print(messages)
+
+tool_use = next(block for block in response.content if block.type == "tool_use")
+
+result = get_curent_datetime(**tool_use.input)
+
+messages.append(
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": tool_use.id,
+                "content": result,
+                "is_error": False,
+            }
+        ],
+    }
+)
+
+print(messages)
+
+response = client.messages.create(
+    model=model, max_tokens=1000, messages=messages, tools=[get_curent_datetime_schema]
+)
+
+print(response.content)
